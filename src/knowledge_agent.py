@@ -71,6 +71,9 @@ class ExtractionResult(BaseModel):
         }
 
 
+KnowledgeAgentOutput = ExtractionResult
+
+
 def get_knowledge_agent(model: str = "google-gla:gemini-2.5-flash"):
     """Initialize the Knowledge Agent.
 
@@ -165,7 +168,7 @@ def get_knowledge_agent(model: str = "google-gla:gemini-2.5-flash"):
         model,
         retries=3,
         output_retries=3,
-        output_type=ExtractionResult,
+        output_type=KnowledgeAgentOutput,
         system_prompt=system_prompt,
         tools=[search_ontology_with_oak, search_web],
     )
