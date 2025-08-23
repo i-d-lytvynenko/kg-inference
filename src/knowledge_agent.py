@@ -1,13 +1,11 @@
 from datetime import datetime
 from textwrap import dedent
-from typing import Any, Literal, cast
-from urllib.error import URLError
+from typing import Any, Literal
 
-from aurelian.agents.web.web_mcp import search_web
-from oaklib.interfaces.search_interface import SearchInterface
-from oaklib.selector import get_adapter  # pyright: ignore[reportUnknownVariableType]
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
+
+from src.tools import search_ontology_with_oak, search_web
 
 
 class SimpleEntity(BaseModel):
@@ -71,56 +69,6 @@ class ExtractionResult(BaseModel):
             "schema_name": self.schema_name,
             "timestamp": self.timestamp.isoformat(),
         }
-
-
-async def search_ontology_with_oak(
-    term: str, ontology: str, n: int = 10, verbose: bool = True
-) -> list[tuple[str, str]]:
-    """
-    Search an OBO ontology for a term.
-
-    Note that search should take into account synonyms, but synonyms may be incomplete,
-    so if you cannot find a concept of interest, try searching using related or synonymous
-    terms. For example, if you do not find a term for 'eye defect' in the Human Phenotype Ontology,
-    try searching for "abnormality of eye" and also try searching for "eye" and then
-    looking through the results to find the more specific term you are interested in.
-
-    Also remember to check for upper and lower case variations of the term.
-
-    If you are searching for a composite term, try searching on the sub-terms to get a sense
-    of the terminology used in the ontology.
-
-    Args:
-        term: The term to search for.
-        ontology: The ontology ID to search. You can try prepending "ols:" to an ontology
-        name to use the ontology lookup service (OLS), for example "ols:mondo" or
-        "ols:hp". Try first using "ols:". You can also try prepending "sqlite:obo:" to
-        an ontology name to use the local sqlite version of ontologies, but
-        **you should prefer "ols:" because it seems to do better for finding
-        non-exact matches!**
-        n: The maximum number of results to return.
-        verbose: Whether to print debug information.
-
-    Returns:
-        A list of tuples, each containing an ontology ID and a label.
-    """
-
-    try:
-        adapter = cast(SearchInterface, get_adapter(ontology))
-        results = adapter.basic_search(term)
-        results = list(adapter.labels(results))
-    except (ValueError, URLError, KeyError):
-        print(
-            f"## TOOL WARNING: Unable to search ontology '{ontology}' - unknown url type: '{ontology}'"
-        )
-        return []
-    if n:
-        results = list(results)[:n]
-
-    if verbose:
-        print(f"## TOOL USE: Searched for '{term}' in '{ontology}' ontology")
-        print(f"## RESULTS: {results}")
-    return results
 
 
 def get_knowledge_agent(model: str = "google-gla:gemini-2.5-flash"):
