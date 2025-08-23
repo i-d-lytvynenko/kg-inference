@@ -33,6 +33,7 @@ packages = [{include = "src"}]
 
 [tool.poetry.group.dev.dependencies]
 basedpyright = "1.31.2"
+mlflow = "^3.3.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
