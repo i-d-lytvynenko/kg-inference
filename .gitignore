@@ -208,3 +208,7 @@ __marimo__/
 
 # Pyright-generated type stubs
 typings/
+
+# MLflow artifacts
+mlartifacts/
+mlruns/
