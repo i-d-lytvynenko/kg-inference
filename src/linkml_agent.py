@@ -68,8 +68,8 @@ def get_linkml_agent(
         tools=[
             Tool(inspect_file),
             Tool(download_url_as_markdown),
-            Tool(validate_then_save_schema),
-            Tool(validate_data),
+            Tool(validate_then_save_schema, max_retries=3),
+            Tool(validate_data, max_retries=3),
         ],
         system_prompt=system_prompt,
     )
