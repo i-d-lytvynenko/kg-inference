@@ -58,7 +58,6 @@ def get_linkml_agent(
 
     Args:
         model: The model to use for the agent
-        deps: Dependencies for the agent (LinkMLDependencies with composed deps)
 
     Returns:
         Agent: A configured agent for creating LinkML schemas and example datasets
