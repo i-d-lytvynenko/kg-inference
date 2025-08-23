@@ -1,0 +1,39 @@
+[project]
+name = "kg-inference"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Ivan Lytvynenko",email = "lytvynenko.i.d@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4"
+dependencies = [
+    "aurelian (>=0.4.2,<0.5.0)",
+    "pypdf2 (>=3.0.1,<4.0.0)"
+]
+
+
+[tool.pyright]
+reportUnknownMemberType = "none"
+reportUnannotatedClassAttribute = "none"
+reportExplicitAny = "none"
+reportImplicitStringConcatenation = "none"
+reportUnusedCallResult = "none"
+reportAny = "hint"
+reportMissingTypeStubs = "none"
+
+
+[tool.ruff]
+select = ["I001"]
+
+
+[tool.poetry]
+packages = [{include = "src"}]
+
+
+[tool.poetry.group.dev.dependencies]
+basedpyright = "1.31.2"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
