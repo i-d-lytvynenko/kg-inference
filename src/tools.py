@@ -297,11 +297,14 @@ async def validate_then_save_schema(
         schema_dict = cast(dict[str, Any], yaml.safe_load(schema_as_str))
         logger.info("YAML is valid")
     except Exception as e:
-        raise SchemaValidationError(f"Schema is not valid yaml: {e}")
+        msgs.append(f"Schema is not valid yaml: {e}")
+        return ValidationResult(valid=False, info_messages=msgs)
     if "id" not in schema_dict:
-        raise SchemaValidationError("Schema does not have a top level id")
+        msgs.append("Schema does not have a top level id")
     if "name" not in schema_dict:
-        raise SchemaValidationError("Schema does not have a top level name")
+        msgs.append("Schema does not have a top level name")
+    if msgs:
+        return ValidationResult(valid=False, info_messages=msgs)
     try:
         schema_obj = cast(
             SchemaDefinition,
@@ -309,7 +312,8 @@ async def validate_then_save_schema(
         )
     except Exception as e:
         logger.error(f"Invalid schema: {schema_as_str}")
-        raise ModelRetry(f"Schema does not validate: {e}")
+        msgs.append(f"Schema does not validate: {e}")
+        return ValidationResult(valid=False, info_messages=msgs)
     gen = JsonSchemaGenerator(schema_obj)
     gen.serialize()
     if save_to_file:
