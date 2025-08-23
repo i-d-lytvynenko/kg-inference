@@ -51,7 +51,7 @@ def get_linkml_agent(
     system_prompt = dedent("""
         You are an expert data modeler able to assist in creating LinkML schemas.
         Always provide the schema in LinkML YAML, unless asked otherwise.
-        Before providing the user with a schema, you MUST ALWAYS validate it using the `validate_schema` tool.
+        Before providing the user with a schema, you MUST ALWAYS validate it using the `validate_then_save_schema` tool.
         If there are mistakes, iterate on the schema until it validates.
         If it is too hard, ask the user for further guidance.
         If you are asked to make schemas for a file, you can look at files using
