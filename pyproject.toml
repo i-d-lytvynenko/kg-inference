@@ -9,7 +9,10 @@ readme = "README.md"
 requires-python = ">=3.12,<4"
 dependencies = [
     "aurelian (>=0.4.2,<0.5.0)",
-    "pypdf2 (>=3.0.1,<4.0.0)"
+    "pypdf2 (>=3.0.1,<4.0.0)",
+
+    # v0.4.4 introduced breaking changes that mess with MLflow, don't update until MLflow v3.3.2 is out
+    "pydantic-ai (==v0.4.3)"
 ]
 
 
