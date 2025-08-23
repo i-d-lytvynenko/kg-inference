@@ -1,3 +1,4 @@
+import logging
 import re
 import tempfile
 from abc import ABC
@@ -28,6 +29,9 @@ from oaklib.interfaces.search_interface import SearchInterface
 from oaklib.selector import get_adapter  # pyright: ignore[reportUnknownVariableType]
 from pydantic import BaseModel
 from pydantic_ai import AgentRunError, ModelRetry, RunContext
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 @dataclass
@@ -159,7 +163,6 @@ def retrieve_web_page(url: str) -> str:
     if url.startswith("https://pmc.ncbi.nlm.nih.gov/articles/PMC"):
         url = url.strip("/")
         pmc_id = url.split("/")[-1]
-        # print(f"REWIRING URL: Fetching PMC ID: {pmc_id}")
         return get_pmcid_text(pmc_id)
 
     doi = extract_doi_from_url(url)
@@ -189,7 +192,7 @@ def retrieve_web_page(url: str) -> str:
 
 
 async def search_ontology_with_oak(
-    term: str, ontology: str, n: int = 10, verbose: bool = True
+    term: str, ontology: str, n: int = 10
 ) -> list[tuple[str, str]]:
     """
     Search an OBO ontology for a term.
@@ -214,7 +217,6 @@ async def search_ontology_with_oak(
         **you should prefer "ols:" because it seems to do better for finding
         non-exact matches!**
         n: The maximum number of results to return.
-        verbose: Whether to print debug information.
 
     Returns:
         A list of tuples, each containing an ontology ID and a label.
@@ -225,16 +227,15 @@ async def search_ontology_with_oak(
         results = adapter.basic_search(term)
         results = list(adapter.labels(results))
     except (ValueError, URLError, KeyError):
-        print(
-            f"## TOOL WARNING: Unable to search ontology '{ontology}' - unknown url type: '{ontology}'"
+        logger.warning(
+            f"Unable to search ontology '{ontology}' - unknown url type: '{ontology}'"
         )
         return []
     if n:
         results = list(results)[:n]
 
-    if verbose:
-        print(f"## TOOL USE: Searched for '{term}' in '{ontology}' ontology")
-        print(f"## RESULTS: {results}")
+    logger.info(f"Searched for '{term}' in '{ontology}' ontology")
+    logger.info(f"Results: {results}")
     return results
 
 
@@ -270,7 +271,7 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
     Returns:
 
     """
-    print(f"Inspecting file: {data_file}")
+    logger.info(f"Inspecting file: {data_file}")
     return ctx.deps.workdir.read_file(data_file)
 
 
@@ -290,11 +291,11 @@ async def validate_then_save_schema(
     Returns:
 
     """
-    print(f"Validating schema: {schema_as_str}")
+    logger.info(f"Validating schema: {schema_as_str}")
     msgs: list[str] = []
     try:
         schema_dict = cast(dict[str, Any], yaml.safe_load(schema_as_str))
-        print("YAML is valid")
+        logger.info("YAML is valid")
     except Exception as e:
         raise SchemaValidationError(f"Schema is not valid yaml: {e}")
     if "id" not in schema_dict:
@@ -307,7 +308,7 @@ async def validate_then_save_schema(
             yaml_loader.loads(schema_as_str, target_class=SchemaDefinition),
         )
     except Exception as e:
-        print(f"Invalid schema: {schema_as_str}")
+        logger.error(f"Invalid schema: {schema_as_str}")
         raise ModelRetry(f"Schema does not validate: {e}")
     gen = JsonSchemaGenerator(schema_obj)
     gen.serialize()
@@ -338,7 +339,7 @@ async def validate_data(
     Returns:
 
     """
-    print(f"Validating data file: {data_file} using schema: {schema}")
+    logger.info(f"Validating data file: {data_file} using schema: {schema}")
     try:
         parsed_schema = cast(
             SchemaDefinition,
@@ -353,9 +354,9 @@ async def validate_data(
         instances = load_objects(path_to_file)
 
         for instance in instances:
-            print(f"Validating {instance}")
+            logger.info(f"Validating {instance}")
             rpt = validate(instance, parsed_schema)
-            print(f"Validation report: {rpt}")
+            logger.info(f"Validation report: {rpt}")
             if rpt.results:
                 return f"Data does not validate:\n{rpt.results}"
         return f"{len(instances)} instances all validate successfully"
