@@ -1,12 +1,54 @@
+import os
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 from aurelian.agents.filesystem.filesystem_tools import (
     download_url_as_markdown,
     inspect_file,
 )
-from aurelian.agents.linkml.linkml_config import LinkMLDependencies
 from aurelian.agents.linkml.linkml_tools import validate_data, validate_then_save_schema
-from pydantic_ai import Agent, Tool
+from aurelian.dependencies.workdir import HasWorkdir, WorkDir
+from linkml_store.utils.format_utils import (
+    load_objects,  # pyright: ignore[reportUnknownVariableType]
+)
+from pydantic_ai import Agent, AgentRunError, Tool
+
+
+@dataclass
+class LinkMLDependencies(HasWorkdir):
+    """Configuration for the LinkML agent."""
+
+    def parse_objects_from_file(self, data_file: str) -> list[dict[str, Any]]:
+        """
+        Parse objects from a file in the working directory.
+
+        Args:
+            data_file: Name of the data file in the working directory
+
+        Returns:
+            List of parsed objects
+        """
+
+        path_to_file = self.workdir.get_file_path(data_file)
+        if not path_to_file.exists():
+            raise AgentRunError(f"Data file {data_file} does not exist")
+        return load_objects(path_to_file)
+
+
+def get_config() -> LinkMLDependencies:
+    """
+    Get the LinkML agent configuration.
+
+    Returns:
+        LinkMLDependencies: The LinkML dependencies
+    """
+
+    workdir_path = os.environ.get("AURELIAN_WORKDIR", None)
+    if workdir_path:
+        return LinkMLDependencies(workdir=WorkDir(location=workdir_path))
+    else:
+        return LinkMLDependencies()
 
 
 def get_linkml_agent(
