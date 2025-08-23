@@ -17,7 +17,6 @@ from aurelian.utils.pubmed_utils import (
     get_pmid_text,
 )
 from duckduckgo_search import DDGS
-from linkml.generators import JsonSchemaGenerator
 from linkml.validator import validate  # pyright: ignore[reportUnknownVariableType]
 from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader
@@ -265,30 +264,29 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
     Inspect a file in the working directory.
 
     Args:
-        ctx:
         data_file: name of file
 
     Returns:
+        class ValidationResult(BaseModel):
+            valid: bool
+            info_messages: list[str] | None = None
 
     """
     logger.info(f"Inspecting file: {data_file}")
     return ctx.deps.workdir.read_file(data_file)
 
 
-async def validate_then_save_schema(
-    ctx: RunContext[HasWorkdir],
-    schema_as_str: str,
-    save_to_file: str = "schema.yaml",
-) -> ValidationResult:
+async def validate_schema(schema_as_str: str,) -> ValidationResult:
     """
     Validate a LinkML schema.
 
     Args:
-        ctx: context
         schema_as_str: linkml schema (as yaml) to validate. Do not truncate, always pass the whole schema.
-        save_to_file: file name to save the schema to. Defaults to schema.yaml
 
     Returns:
+        class ValidationResult(BaseModel):
+            valid: bool
+            info_messages: list[str] | None = None
 
     """
     logger.info(f"Validating schema: {schema_as_str}")
@@ -306,7 +304,7 @@ async def validate_then_save_schema(
     if msgs:
         return ValidationResult(valid=False, info_messages=msgs)
     try:
-        schema_obj = cast(
+        _ = cast(
             SchemaDefinition,
             yaml_loader.loads(schema_as_str, target_class=SchemaDefinition),
         )
@@ -314,13 +312,6 @@ async def validate_then_save_schema(
         logger.error(f"Invalid schema: {schema_as_str}")
         msgs.append(f"Schema does not validate: {e}")
         return ValidationResult(valid=False, info_messages=msgs)
-    gen = JsonSchemaGenerator(schema_obj)
-    gen.serialize()
-    if save_to_file:
-        msgs.append(f"Writing schema to {save_to_file}")
-        workdir = ctx.deps.workdir
-        workdir.write_file(save_to_file, schema_as_str)
-
     return ValidationResult(valid=True, info_messages=msgs)
 
 
@@ -341,6 +332,7 @@ async def validate_data(
         data_file: the name of the data file in the working directory
 
     Returns:
+        validation status message
 
     """
     logger.info(f"Validating data file: {data_file} using schema: {schema}")
