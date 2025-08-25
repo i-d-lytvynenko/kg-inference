@@ -29,7 +29,7 @@ def get_config() -> LinkMLDependencies:
         LinkMLDependencies: The LinkML dependencies
     """
 
-    workdir_path = os.environ.get("AURELIAN_WORKDIR", None)
+    workdir_path = os.environ.get("WORKDIR", None)
     if workdir_path:
         return LinkMLDependencies(workdir=WorkDir(location=workdir_path))
     else:
