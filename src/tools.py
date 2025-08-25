@@ -10,12 +10,6 @@ from urllib.error import URLError
 import httpx
 import requests
 import yaml
-from aurelian.utils.pubmed_utils import (
-    doi_to_pmid,
-    extract_doi_from_url,
-    get_pmcid_text,
-    get_pmid_text,
-)
 from duckduckgo_search import DDGS
 from linkml.validator import validate  # pyright: ignore[reportUnknownVariableType]
 from linkml_runtime.linkml_model import SchemaDefinition
@@ -140,18 +134,6 @@ def retrieve_web_page(url: str) -> str:
         >>> text = retrieve_web_page(url)
         >>> assert "COVID-19" in text
 
-    PMCs are redirected:
-
-        >>> url = "https://pmc.ncbi.nlm.nih.gov/articles/PMC5048378/"
-        >>> text = retrieve_web_page(url)
-        >>> assert "integrated stress response (ISR)" in text
-
-    URLs with DOIs:
-
-        >>> url = "https://microbiomejournal.biomedcentral.com/articles/10.1186/s40168-020-00889-8"
-        >>> text = retrieve_web_page(url)
-        >>> assert "photosynthesis" in text
-
     Args:
         url: URL of the web page
 
@@ -159,21 +141,9 @@ def retrieve_web_page(url: str) -> str:
         str: The text of the web page
 
     """
-    if url.startswith("https://pmc.ncbi.nlm.nih.gov/articles/PMC"):
-        url = url.strip("/")
-        pmc_id = url.split("/")[-1]
-        return get_pmcid_text(pmc_id)
-
-    doi = extract_doi_from_url(url)
-    if doi:
-        pmid = doi_to_pmid(doi)
-        if pmid is not None:
-            return get_pmid_text(pmid)
-
     response = requests.get(url, timeout=20)
     response.raise_for_status()
 
-    # Convert the HTML content to Markdown
     markdown_content = markdownify(response.text).strip()
 
     # Remove multiple line breaks
@@ -276,7 +246,9 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
     return ctx.deps.workdir.read_file(data_file)
 
 
-async def validate_schema(schema_as_str: str,) -> ValidationResult:
+async def validate_schema(
+    schema_as_str: str,
+) -> ValidationResult:
     """
     Validate a LinkML schema.
 
