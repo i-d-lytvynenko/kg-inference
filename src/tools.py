@@ -217,22 +217,6 @@ async def search_ontology_with_oak(
     return results
 
 
-class LinkMLError(ModelRetry):
-    pass
-
-
-class SchemaValidationError(LinkMLError):
-    """Base exception for all schema validation errors."""
-
-    def __init__(
-        self,
-        message: str = "Schema validation failed",
-        details: dict[str, Any] | None = None,
-    ):
-        self.details = details or {}
-        super().__init__(message)
-
-
 class ValidationResult(BaseModel):
     valid: bool
     info_messages: list[str] | None = None
@@ -381,18 +365,6 @@ async def download_url_as_markdown(
         return DownloadResult(
             file_name=local_file_name, num_lines=len(markdown_content.split("\n"))
         )
-
-
-class OwlValidationError(ModelRetry):
-    """Base exception for all OWL validation errors."""
-
-    def __init__(
-        self,
-        message: str = "OWL validation failed",
-        details: dict[str, Any] | None = None,
-    ):
-        self.details = details or {}
-        super().__init__(message)
 
 
 def extract_xml_code(text: str) -> str:
