@@ -115,8 +115,8 @@ def get_knowledge_agent(model: str = "google-gla:gemini-2.5-flash"):
         Note that when looking for ontology terms that you can ground entities to, the
         search should take into account synonyms. Also, synonyms may be incomplete, so if
         you cannot find a concept of interest, try searching using related or synonymous
-        terms. For example, if you do not find a term for  'eye defect' or 'eye issues'
-        in the Human Phenotype Ontology, try searching for "abnormality of  eye" or
+        terms. For example, if you do not find a term for 'eye defect' or 'eye issues'
+        in the Human Phenotype Ontology, try searching for "abnormality of eye" or
         "eye abnormality" instead. Also be sure to check for upper and lower case
         variations of the term.
 
