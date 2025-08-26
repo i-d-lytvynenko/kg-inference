@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 
 from src.linkml_agent import get_config, get_linkml_agent
+from src.utils import format_prompt
 
 
 async def generate_schema():
@@ -10,24 +11,24 @@ async def generate_schema():
     """
     agent = get_linkml_agent()
 
-    prompt = """
-    Create a LinkML schema for cognitive biases. The schema should include:
+    prompt = format_prompt("""
+        Create a LinkML schema for cognitive biases. The schema should include:
 
-    1.  **Entities:**
-        *   `CognitiveBias`: A core entity representing a cognitive bias.
-        *   `SystematicError`: A type of error that can be associated with cognitive biases.
-        *   `DecisionProcess`: Represents a process where decisions are made.
-        *   `SuboptimalDecision`: Represents a decision that is not optimal.
+        1.  **Entities:**
+            *   `CognitiveBias`: A core entity representing a cognitive bias.
+            *   `SystematicError`: A type of error that can be associated with cognitive biases.
+            *   `DecisionProcess`: Represents a process where decisions are made.
+            *   `SuboptimalDecision`: Represents a decision that is not optimal.
 
-    2.  **Relationships:**
-        *   `is_a`: Standard inheritance relationship (e.g., CognitiveBias is_a SystematicError).
-        *   `leads_to`: Connects a cause to an effect (e.g., SystematicError leads_to SuboptimalDecision).
-        *   `exhibits`: Connects a DecisionProcess to a CognitiveBias (e.g., DecisionProcess exhibits ConfirmationBias).
-        *   `is_prone_to`: Connects a DecisionProcess to a SuboptimalDecision (this will be inferred).
+        2.  **Relationships:**
+            *   `is_a`: Standard inheritance relationship (e.g., CognitiveBias is_a SystematicError).
+            *   `leads_to`: Connects a cause to an effect (e.g., SystematicError leads_to SuboptimalDecision).
+            *   `exhibits`: Connects a DecisionProcess to a CognitiveBias (e.g., DecisionProcess exhibits ConfirmationBias).
+            *   `is_prone_to`: Connects a DecisionProcess to a SuboptimalDecision (this will be inferred).
 
-    Ensure the schema is well-structured and includes appropriate types and slots for these entities and relationships.
-    Return only yaml without additional comments.
-    """
+        Ensure the schema is well-structured and includes appropriate types and slots for these entities and relationships.
+        Return only yaml without additional comments.
+    """)
 
     print("Generating LinkML schema...")
     deps = get_config()

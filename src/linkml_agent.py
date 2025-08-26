@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass
-from textwrap import dedent
 
 from pydantic_ai import Agent, Tool
 
@@ -12,6 +11,7 @@ from src.tools import (
     validate_data,
     validate_schema,
 )
+from src.utils import format_prompt
 
 
 @dataclass
@@ -48,7 +48,7 @@ def get_linkml_agent(
         Agent: A configured agent for creating LinkML schemas and example datasets
     """
 
-    system_prompt = dedent("""
+    system_prompt = format_prompt("""
         You are an expert data modeler able to assist in creating LinkML schemas.
         Always provide the schema in LinkML YAML, unless asked otherwise.
         Before providing the user with a schema, you MUST ALWAYS validate it using the `validate_schema` tool.

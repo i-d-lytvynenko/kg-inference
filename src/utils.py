@@ -1,6 +1,11 @@
 import os
+from textwrap import dedent
 
 import PyPDF2
+
+
+def format_prompt(prompt: str) -> str:
+    return dedent(prompt.strip())
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:

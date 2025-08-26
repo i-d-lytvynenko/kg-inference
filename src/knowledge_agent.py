@@ -1,11 +1,11 @@
 from datetime import datetime
-from textwrap import dedent
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 from src.tools import search_ontology_with_oak, search_web
+from src.utils import format_prompt
 
 
 class SimpleEntity(BaseModel):
@@ -84,7 +84,7 @@ def get_knowledge_agent(model: str = "google-gla:gemini-2.5-flash"):
         Agent: A configured knowledge agent
     """
 
-    system_prompt = dedent("""
+    system_prompt = format_prompt("""
         You are an expert curator of scientific knowledge. Your purpose is to take
         unstructured scientific text and output structured scientific knowledge that is
         aligned to a LinkML schema that describes the knowledge the user wants to extract.
