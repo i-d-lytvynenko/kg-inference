@@ -36,10 +36,9 @@ async def generate_schema():
     print("\n--- Generated LinkML Schema ---\n")
     print(schema)
 
-    # Optionally, save the schema to a file
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
-    schema_file = output_dir / "cognitive_biases.yaml"
+    schema_file = output_dir / "schema.yaml"
     schema_file.write_text(schema)
     print(f"\nSchema saved to {schema_file.absolute()}")
 
