@@ -1,3 +1,5 @@
+# pyright: reportUnknownVariableType = information
+import io
 import logging
 import re
 import tempfile
@@ -11,15 +13,22 @@ import httpx
 import requests
 import yaml
 from duckduckgo_search import DDGS
-from linkml.validator import validate  # pyright: ignore[reportUnknownVariableType]
+from linkml.validator import validate
 from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader
 from linkml_store.utils.format_utils import (
-    load_objects,  # pyright: ignore[reportUnknownVariableType]
+    load_objects,
 )
 from markdownify import markdownify
 from oaklib.interfaces.search_interface import SearchInterface
-from oaklib.selector import get_adapter  # pyright: ignore[reportUnknownVariableType]
+from oaklib.selector import get_adapter
+from owlready2 import (
+    Ontology,
+    OwlReadyInconsistentOntologyError,
+    OwlReadyOntologyParsingError,
+    get_ontology,
+    sync_reasoner,
+)
 from pydantic import BaseModel
 from pydantic_ai import AgentRunError, ModelRetry, RunContext
 
@@ -372,3 +381,73 @@ async def download_url_as_markdown(
         return DownloadResult(
             file_name=local_file_name, num_lines=len(markdown_content.split("\n"))
         )
+
+
+class OwlValidationError(ModelRetry):
+    """Base exception for all OWL validation errors."""
+
+    def __init__(
+        self,
+        message: str = "OWL validation failed",
+        details: dict[str, Any] | None = None,
+    ):
+        self.details = details or {}
+        super().__init__(message)
+
+
+def extract_xml_code(text: str) -> str:
+    pattern = r"```(?:xml|owl|rdf)?\s*([\s\S]*?)```"
+    matches = re.findall(pattern, text, re.IGNORECASE)
+
+    if matches:
+        return "\n\n".join(matches).strip()
+    else:
+        return text.strip()
+
+
+async def validate_owl_ontology(owl_content: str) -> ValidationResult:
+    """
+    Validate an OWL ontology for parsing errors and logical consistency.
+
+    Args:
+        owl_content: The OWL ontology content as a string in RDF/XML format.
+
+    Returns:
+        ValidationResult: Indicates whether the OWL ontology is valid and consistent.
+    """
+    logger.info("Validating OWL ontology.")
+    msgs: list[str] = []
+    owl_content = extract_xml_code(owl_content)
+    fileobj = io.BytesIO(str.encode(owl_content))
+
+    try:
+        onto = cast(
+            Ontology,
+            get_ontology(
+                base_iri="http://www.example.org/philosophical_implications#"
+            ).load(fileobj=fileobj),
+        )
+        logger.info("Successfully loaded OWL ontology.")
+
+        with onto:
+            sync_reasoner(debug=False)
+
+        logger.info("OWL ontology is logically consistent.")
+
+        return ValidationResult(valid=True, info_messages=msgs)
+
+    except OwlReadyOntologyParsingError as e:
+        msg = f"Error parsing OWL content: {e}"
+        logger.error(msg)
+        msgs.append(msg)
+        return ValidationResult(valid=False, info_messages=msgs)
+    except OwlReadyInconsistentOntologyError:
+        msg = "OWL ontology is logically inconsistent."
+        logger.error(msg)
+        msgs.append(msg)
+        return ValidationResult(valid=False, info_messages=msgs)
+    except Exception as e:
+        msg = f"An unexpected error occurred during OWL validation: {e}"
+        logger.error(msg)
+        msgs.append(msg)
+        return ValidationResult(valid=False, info_messages=msgs)
