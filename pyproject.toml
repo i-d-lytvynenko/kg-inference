@@ -18,6 +18,7 @@ dependencies = [
 
     # v0.4.4 introduced breaking changes that mess with MLflow, don't update until MLflow v3.3.2 is out
     "pydantic-ai (==v0.4.3)",
+    "setuptools (==66.1.1)",
 ]
 
 
