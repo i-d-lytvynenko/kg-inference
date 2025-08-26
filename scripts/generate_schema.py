@@ -1,15 +1,15 @@
 import asyncio
 from pathlib import Path
 
-from src.linkml_agent import get_config, get_linkml_agent
+from src.schema_agent import get_config, get_schema_agent
 from src.utils import format_prompt
 
 
 async def generate_schema():
     """
-    Generates a LinkML schema for cognitive biases using the LinkML agent.
+    Generates a LinkML schema for cognitive biases using the Schema agent.
     """
-    agent = get_linkml_agent()
+    agent = get_schema_agent()
 
     prompt = format_prompt("""
         Create a LinkML schema for cognitive biases. The schema should include:
@@ -27,7 +27,6 @@ async def generate_schema():
             *   `is_prone_to`: Connects a DecisionProcess to a SuboptimalDecision (this will be inferred).
 
         Ensure the schema is well-structured and includes appropriate types and slots for these entities and relationships.
-        Return only yaml without additional comments.
     """)
 
     print("Generating LinkML schema...")
@@ -47,7 +46,7 @@ if __name__ == "__main__":
     import mlflow
 
     mlflow.set_tracking_uri("http://localhost:5000")
-    mlflow.set_experiment("LinkML Generation")
+    mlflow.set_experiment("kg-inference")
     mlflow.pydantic_ai.autolog()  # pyright: ignore[reportPrivateImportUsage]
 
     with mlflow.start_run():
