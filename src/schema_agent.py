@@ -1,5 +1,4 @@
-import os
-from dataclasses import dataclass
+from pathlib import Path
 
 from pydantic_ai import Agent, Tool
 
@@ -14,14 +13,13 @@ from src.tools import (
 from src.utils import format_prompt
 
 
-@dataclass
 class SchemaDependencies(HasWorkdir):
     """Configuration for the Schema agent."""
 
     pass
 
 
-def get_config() -> SchemaDependencies:
+def get_config(workdir_path: Path | None = None) -> SchemaDependencies:
     """
     Get the Schema agent configuration.
 
@@ -29,9 +27,8 @@ def get_config() -> SchemaDependencies:
         SchemaDependencies: The Schema dependencies
     """
 
-    workdir_path = os.environ.get("WORKDIR", None)
     if workdir_path:
-        return SchemaDependencies(workdir=WorkDir(location=workdir_path))
+        return SchemaDependencies(workdir=WorkDir(location=str(workdir_path)))
     else:
         return SchemaDependencies()
 

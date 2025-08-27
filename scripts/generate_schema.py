@@ -31,7 +31,8 @@ async def generate_schema():
     """)
 
     print("Generating LinkML schema...")
-    deps = get_config()
+
+    deps = get_config(workdir_path=settings.workdir_path)
     schema = (await agent.run(prompt, deps=deps)).output
     print("\n--- Generated LinkML Schema ---\n")
     print(schema)

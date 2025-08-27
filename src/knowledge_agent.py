@@ -4,8 +4,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
-from src.tools import search_ontology_with_oak, search_web
+from src.tools import (
+    HasData,
+    search_external_ontology,
+    search_project_ontology,
+    search_web,
+)
 from src.utils import format_prompt
+
+
+class KnowledgeDependencies(HasData):
+    """Configuration for the Knowledge agent."""
+
+    pass
 
 
 class SimpleEntity(BaseModel):
@@ -166,9 +177,10 @@ def get_knowledge_agent(model: str):
 
     return Agent(
         model,
+        deps_type=KnowledgeDependencies,
         retries=3,
         output_retries=3,
         output_type=KnowledgeAgentOutput,
         system_prompt=system_prompt,
-        tools=[search_ontology_with_oak, search_web],
+        tools=[search_external_ontology, search_project_ontology, search_web],
     )

@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     schema_path: Path = Path("output", "schema.yaml")
     data_path: Path = Path("output", "data.xml")
+    workdir_path: Path | None = None
     schema_model_name: str = "google-gla:gemini-2.5-flash"
     knowledge_model_name: str = "google-gla:gemini-2.5-flash"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
