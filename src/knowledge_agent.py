@@ -74,7 +74,7 @@ class ExtractionResult(BaseModel):
 KnowledgeAgentOutput = ExtractionResult
 
 
-def get_knowledge_agent(model: str = "google-gla:gemini-2.5-flash"):
+def get_knowledge_agent(model: str):
     """Initialize the Knowledge Agent.
 
     Args:

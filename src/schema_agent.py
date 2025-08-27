@@ -37,7 +37,7 @@ def get_config() -> SchemaDependencies:
 
 
 def get_schema_agent(
-    model: str = "google-gla:gemini-2.5-flash",
+    model: str,
 ) -> Agent[SchemaDependencies, str]:
     """Initialize the Schema Agent.
 

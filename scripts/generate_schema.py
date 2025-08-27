@@ -1,6 +1,6 @@
 import asyncio
-from pathlib import Path
 
+from src.config import get_settings
 from src.schema_agent import get_config, get_schema_agent
 from src.utils import format_prompt
 
@@ -9,7 +9,8 @@ async def generate_schema():
     """
     Generates a LinkML schema for cognitive biases using the Schema agent.
     """
-    agent = get_schema_agent()
+    settings = get_settings()
+    agent = get_schema_agent(model=settings.schema_model_name)
 
     prompt = format_prompt("""
         Create a LinkML schema for cognitive biases. The schema should include:
@@ -35,9 +36,8 @@ async def generate_schema():
     print("\n--- Generated LinkML Schema ---\n")
     print(schema)
 
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
-    schema_file = output_dir / "schema.yaml"
+    schema_file = settings.schema_path
+    schema_file.mkdir(exist_ok=True)
     schema_file.write_text(schema)
     print(f"\nSchema saved to {schema_file.absolute()}")
 
