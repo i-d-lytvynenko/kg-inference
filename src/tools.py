@@ -108,6 +108,11 @@ class HasWorkdir(ABC):
     workdir: WorkDir = field(default_factory=lambda: WorkDir())
 
 
+@dataclass
+class HasData(ABC):
+    data_path: Path
+
+
 async def search_web(query: str) -> str:
     """
     Search the web using a text query.
@@ -169,19 +174,19 @@ def retrieve_web_page(url: str) -> str:
         )
 
 
-async def search_ontology_with_oak(
-    term: str, ontology: str, n: int = 10
+async def search_external_ontology(
+    term: str,
+    ontology: str,
+    n: int = 10,
 ) -> list[tuple[str, str]]:
     """
-    Search an OBO ontology for a term.
+    Search an external ontology for a term.
 
     Note that search should take into account synonyms, but synonyms may be incomplete,
     so if you cannot find a concept of interest, try searching using related or synonymous
     terms. For example, if you do not find a term for 'eye defect' in the Human Phenotype Ontology,
     try searching for "abnormality of eye" and also try searching for "eye" and then
     looking through the results to find the more specific term you are interested in.
-
-    Also remember to check for upper and lower case variations of the term.
 
     If you are searching for a composite term, try searching on the sub-terms to get a sense
     of the terminology used in the ontology.
@@ -215,6 +220,37 @@ async def search_ontology_with_oak(
     logger.info(f"Searched for '{term}' in '{ontology}' ontology")
     logger.info(f"Results: {results}")
     return results
+
+
+async def search_project_ontology(
+    ctx: RunContext[HasData],
+    term: str,
+    n: int = 10,
+) -> list[tuple[str, str]]:
+    """
+    Search project ontology for a term.
+
+    Note that search should take into account synonyms, but synonyms may be incomplete,
+    so if you cannot find a concept of interest, try searching using related or synonymous
+    terms. For example, if you do not find a term for 'eye defect' in the Human Phenotype Ontology,
+    try searching for "abnormality of eye" and also try searching for "eye" and then
+    looking through the results to find the more specific term you are interested in.
+
+    If you are searching for a composite term, try searching on the sub-terms to get a sense
+    of the terminology used in the ontology.
+
+    Args:
+        term: The term to search for.
+        n: The maximum number of results to return.
+
+    Returns:
+        A list of tuples, each containing an ontology ID and a label.
+    """
+    return await search_external_ontology(
+        term=term,
+        ontology=str(ctx.deps.data_path),
+        n=n,
+    )
 
 
 class ValidationResult(BaseModel):
