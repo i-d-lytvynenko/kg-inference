@@ -53,7 +53,7 @@ class WorkDir:
         'Hello, world!'
     """
 
-    location: str = field(default_factory=lambda: "/tmp")
+    location: str = field(default_factory=tempfile.gettempdir)
 
     @classmethod
     def create_temporary_workdir(cls) -> "WorkDir":
