@@ -15,11 +15,13 @@ dependencies = [
     "oaklib (>=0.6.23,<0.7.0)",
     "linkml (>=1.9.3,<2.0.0)",
     "linkml-store (>=0.2.11,<0.3.0)",
-
-    # v0.4.4 introduced breaking changes that mess with MLflow, don't update until MLflow v3.3.2 is out
-    "pydantic-ai (==v0.4.3)",
+    "pydantic-ai",
     "setuptools (==66.1.1)",
     "pydantic-settings (>=2.10.1,<3.0.0)",
+
+    # linkml-store dependency: I couldn't use any other version.
+    # Also the setup script won't work until you install Rust
+    "lightrdf (==0.4.0)",
 ]
 
 
@@ -43,7 +45,7 @@ packages = [{include = "src"}]
 
 [tool.poetry.group.dev.dependencies]
 basedpyright = "1.31.2"
-mlflow = "^3.3.1"
+mlflow = "^3.3.2"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
