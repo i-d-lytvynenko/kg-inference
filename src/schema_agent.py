@@ -1,25 +1,16 @@
-from pathlib import Path
-
 from pydantic_ai import Agent, Tool
 
-from src.tools import (
-    HasWorkdir,
-    WorkDir,
-    download_url_as_markdown,
-    inspect_file,
-    validate_data,
-    validate_schema,
-)
+from src.tools import validate_schema
 from src.utils import format_prompt
 
 
-class SchemaDependencies(HasWorkdir):
+class SchemaDependencies:
     """Configuration for the Schema agent."""
 
     pass
 
 
-def get_config(workdir_path: Path | None = None) -> SchemaDependencies:
+def get_config() -> SchemaDependencies:
     """
     Get the Schema agent configuration.
 
@@ -27,10 +18,7 @@ def get_config(workdir_path: Path | None = None) -> SchemaDependencies:
         SchemaDependencies: The Schema dependencies
     """
 
-    if workdir_path:
-        return SchemaDependencies(workdir=WorkDir(location=str(workdir_path)))
-    else:
-        return SchemaDependencies()
+    return SchemaDependencies()
 
 
 def get_schema_agent(
@@ -50,17 +38,13 @@ def get_schema_agent(
         Always provide the schema in LinkML YAML.
         Before providing the user with a schema, you MUST ALWAYS validate it using the `validate_schema` tool.
         If there are mistakes, iterate on the schema until it validates.
-        If you are asked to make schemas for a file, you can look at files using the `inspect_file` tool.
     """)
 
     linkml_agent = Agent(
         model=model,
         deps_type=SchemaDependencies,
         tools=[
-            Tool(inspect_file),
-            Tool(download_url_as_markdown),
             Tool(validate_schema, max_retries=5),
-            Tool(validate_data, max_retries=3),
         ],
         system_prompt=system_prompt,
     )

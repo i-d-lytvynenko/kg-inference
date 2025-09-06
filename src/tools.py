@@ -3,7 +3,6 @@ import io
 import logging
 import re
 import tempfile
-from abc import ABC
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -17,7 +16,8 @@ from linkml.validator import validate
 from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader
 from linkml_store.utils.format_utils import (
-    load_objects,
+    Format,
+    process_file,
 )
 from markdownify import markdownify
 from oaklib.interfaces.search_interface import SearchInterface
@@ -30,7 +30,7 @@ from owlready2 import (
     sync_reasoner,
 )
 from pydantic import BaseModel
-from pydantic_ai import AgentRunError, ModelRetry, RunContext
+from pydantic_ai import ModelRetry, RunContext
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -104,12 +104,17 @@ class WorkDir:
 
 
 @dataclass
-class HasWorkdir(ABC):
+class HasWorkdir:
     workdir: WorkDir = field(default_factory=lambda: WorkDir())
 
 
 @dataclass
-class HasData(ABC):
+class HasSchema:
+    schema_path: Path
+
+
+@dataclass
+class HasData:
     data_path: Path
 
 
@@ -317,26 +322,24 @@ async def validate_schema(
 
 
 async def validate_data(
-    ctx: RunContext[HasWorkdir],
-    schema: str,
-    data_file: str,
+    ctx: RunContext[HasSchema],
+    data: str,
 ) -> str:
     """
-    Validate data file against a schema.
-
-    This assumes the data file is present in the working directory.
-    You can write data to the working directory using the `write_to_file` tool.
+    Validate data against the schema.
 
     Args:
-        ctx:
-        schema: the schema (as a YAML string)
-        data_file: the name of the data file in the working directory
+        data: extracted data in Turtle format.
 
     Returns:
         validation status message
 
     """
-    logger.info(f"Validating data file: {data_file} using schema: {schema}")
+    schema_path = ctx.deps.schema_path
+    with open(schema_path, "r") as f:
+        schema = f.read()
+
+    logger.info(f"Validating data using schema: {schema}")
     try:
         parsed_schema = cast(
             SchemaDefinition,
@@ -345,10 +348,8 @@ async def validate_data(
     except Exception as e:
         return f"Schema does not validate: {e}"
     try:
-        path_to_file = ctx.deps.workdir.get_file_path(data_file)
-        if not path_to_file.exists():
-            raise AgentRunError(f"Data file {data_file} does not exist")
-        instances = load_objects(path_to_file)
+        fileobj = io.StringIO(data)
+        instances = process_file(f=fileobj, format=Format.TURTLE)
 
         for instance in instances:
             logger.info(f"Validating {instance}")
@@ -375,7 +376,6 @@ async def download_url_as_markdown(
     Download contents of a web page.
 
     Args:
-        ctx: context
         url: URL of the web page
         local_file_name: Name of the local file to save the
 
@@ -403,16 +403,6 @@ async def download_url_as_markdown(
         )
 
 
-def extract_xml_code(text: str) -> str:
-    pattern = r"```(?:xml|owl|rdf)?\s*([\s\S]*?)```"
-    matches = re.findall(pattern, text, re.IGNORECASE)
-
-    if matches:
-        return "\n\n".join(matches).strip()
-    else:
-        return text.strip()
-
-
 async def validate_owl_ontology(owl_content: str) -> ValidationResult:
     """
     Validate an OWL ontology for parsing errors and logical consistency.
@@ -425,7 +415,13 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
     """
     logger.info("Validating OWL ontology.")
     msgs: list[str] = []
-    owl_content = extract_xml_code(owl_content)
+
+    owl_content = owl_content.strip()
+    pattern = r"```(?:xml|owl|rdf)?\s*([\s\S]*?)```"
+    matches = re.findall(pattern, owl_content, re.IGNORECASE)
+    if matches:
+        owl_content = "\n\n".join(matches)
+
     fileobj = io.BytesIO(str.encode(owl_content))
 
     try:
