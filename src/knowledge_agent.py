@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -83,6 +84,17 @@ class ExtractionResult(BaseModel):
 
 
 KnowledgeAgentOutput = ExtractionResult
+
+
+def get_config(data_path: Path) -> KnowledgeDependencies:
+    """
+    Get the Knowledge agent configuration.
+
+    Returns:
+        KnowledgeDependencies: The Knowledge dependencies
+    """
+
+    return KnowledgeDependencies(data_path=data_path)
 
 
 def get_knowledge_agent(model: str):
