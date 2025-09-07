@@ -1,5 +1,5 @@
 import logging
-import os
+import shutil
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
@@ -60,7 +60,7 @@ class TestWorkDir:
         assert Path(wd.location).is_dir()
         assert "tmp" in wd.location
         # Clean up the created directory
-        os.rmdir(wd.location)
+        shutil.rmtree(wd.location)
 
     def test_get_file_path(self, temp_workdir: WorkDir) -> None:
         file_path = temp_workdir.get_file_path("test.txt")
@@ -274,14 +274,18 @@ async def test_validate_data_valid(
                 ORCID:1234 a personinfo:Person ;
                     personinfo:age 30 ;
                     personinfo:full_name "Clark Kent" .
-            """
+            """,
         )
     ]
     schema_path = temp_workdir.get_file_path("mock_schema.yaml")
     temp_workdir.write_file(str(schema_path), schema_content)
     mock_run_context_has_schema.deps.schema_path = schema_path
 
-    result = await validate_data(ctx=mock_run_context_has_schema, prefixes=prefixes, data=data)
+    result = await validate_data(
+        ctx=mock_run_context_has_schema,
+        prefixes=prefixes,
+        data=data,
+    )
     assert result.valid
 
 
@@ -335,14 +339,18 @@ async def test_validate_data_invalid(
                 ORCID:1234 a personinfo:Person ;
                     personinfo:age 330 ;
                     personinfo:full_name "Clark Kent" .
-            """
+            """,
         )
     ]
     schema_path = temp_workdir.get_file_path("mock_schema.yaml")
     temp_workdir.write_file(str(schema_path), schema_content)
     mock_run_context_has_schema.deps.schema_path = schema_path
 
-    result = await validate_data(ctx=mock_run_context_has_schema, prefixes=prefixes, data=data)
+    result = await validate_data(
+        ctx=mock_run_context_has_schema,
+        prefixes=prefixes,
+        data=data,
+    )
     assert not result.valid
 
 
