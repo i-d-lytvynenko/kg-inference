@@ -263,7 +263,7 @@ async def search_project_ontology(
 
 class ValidationResult(BaseModel):
     valid: bool
-    info_messages: list[str] | None = None
+    info_messages: list[str]
 
 
 async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
