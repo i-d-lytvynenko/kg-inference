@@ -1,14 +1,16 @@
 # pyright: reportUnknownVariableType = information
+import contextlib
 import io
 import logging
+import os
 import re
+import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 from urllib.error import URLError
 
-import httpx
 import requests
 import yaml
 from duckduckgo_search import DDGS
@@ -33,7 +35,6 @@ from pydantic import BaseModel
 from pydantic_ai import ModelRetry, RunContext
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 @dataclass
@@ -370,7 +371,9 @@ async def validate_data(
             rpt = validate(as_dict(instance), parsed_schema)
             logger.info(f"Validation report: {rpt}")
             if rpt.results:
-                info_messages = [f"{instance}: {m.message} ({m.type})" for m in rpt.results]
+                info_messages = [
+                    f"{instance}: {m.message} ({m.type})" for m in rpt.results
+                ]
                 return ValidationResult(valid=False, info_messages=info_messages)
         except Exception as e:
             raise ModelRetry(f"Data does not validate: {e}")
@@ -378,45 +381,16 @@ async def validate_data(
     return ValidationResult(valid=True, info_messages=[])
 
 
-class DownloadResult(BaseModel):
-    file_name: str
-    num_lines: int
-
-
-async def download_url_as_markdown(
-    ctx: RunContext[HasWorkdir],
-    url: str,
-    local_file_name: str,
-) -> DownloadResult:
-    """
-    Download contents of a web page.
-
-    Args:
-        url: URL of the web page
-        local_file_name: Name of the local file to save the
-
-    Returns:
-        DownloadResult: information about the downloaded file
-    """
-    workdir: WorkDir = ctx.deps.workdir
-    from markdownify import markdownify
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, timeout=20.0)
-        response.raise_for_status()  # Raise an exception for bad status codes
-
-        # Convert the HTML content to Markdown
-        markdown_content = markdownify(response.text).strip()
-
-        # Remove multiple line breaks
-        markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
-
-        # Assuming write_file is also async
-        workdir.write_file(local_file_name, markdown_content)
-
-        return DownloadResult(
-            file_name=local_file_name, num_lines=len(markdown_content.split("\n"))
-        )
+# Because owlready2 is a joke
+@contextlib.contextmanager
+def suppress_stderr():
+    with open(os.devnull, "w") as devnull:
+        old_stderr = sys.stderr
+        try:
+            sys.stderr = devnull
+            yield
+        finally:
+            sys.stderr = old_stderr
 
 
 async def validate_owl_ontology(owl_content: str) -> ValidationResult:
@@ -440,34 +414,43 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
 
     fileobj = io.BytesIO(str.encode(owl_content))
 
-    try:
-        onto = cast(
-            Ontology,
-            get_ontology(
-                base_iri="http://www.example.org/philosophical_implications#"
-            ).load(fileobj=fileobj),
-        )
-        logger.info("Successfully loaded OWL ontology.")
+    with suppress_stderr():
+        try:
+            onto = cast(
+                Ontology,
+                get_ontology(
+                    base_iri="http://www.example.org/philosophical_implications#"
+                ).load(fileobj=fileobj),
+            )
+            logger.info("Successfully loaded OWL ontology.")
+        except OwlReadyOntologyParsingError as e:
+            msg = f"Error parsing OWL content: {e}"
+            logger.error(msg)
+            msgs.append(msg)
+            return ValidationResult(valid=False, info_messages=msgs)
 
-        with onto:
-            sync_reasoner(debug=False)
+        if logger.getEffectiveLevel() <= logging.DEBUG:
+            classes = list(onto.classes())  # pyright: ignore[reportUnknownArgumentType]
+            logger.debug(f"  - {len(classes)} OWL Classes found:")  # pyright: ignore[reportUnknownArgumentType]
+            for cls in classes:
+                logger.debug(
+                    f"    - {cls.iri} (Label: {cls.label.first() if cls.label else 'N/A'})"
+                )
 
-        logger.info("OWL ontology is logically consistent.")
+            object_properties = list(onto.object_properties())  # pyright: ignore[reportUnknownArgumentType]
+            logger.debug(f"  - {len(object_properties)} OWL Object Properties found:")  # pyright: ignore[reportUnknownArgumentType]
+            for prop in object_properties:
+                logger.debug(
+                    f"    - {prop.iri} (Label: {prop.label.first() if prop.label else 'N/A'})"
+                )
 
-        return ValidationResult(valid=True, info_messages=msgs)
+        try:
+            with onto:
+                sync_reasoner(debug=False)
 
-    except OwlReadyOntologyParsingError as e:
-        msg = f"Error parsing OWL content: {e}"
-        logger.error(msg)
-        msgs.append(msg)
-        return ValidationResult(valid=False, info_messages=msgs)
-    except OwlReadyInconsistentOntologyError:
-        msg = "OWL ontology is logically inconsistent."
-        logger.error(msg)
-        msgs.append(msg)
-        return ValidationResult(valid=False, info_messages=msgs)
-    except Exception as e:
-        msg = f"An unexpected error occurred during OWL validation: {e}"
-        logger.error(msg)
-        msgs.append(msg)
-        return ValidationResult(valid=False, info_messages=msgs)
+            return ValidationResult(valid=True, info_messages=msgs)
+        except OwlReadyInconsistentOntologyError:
+            msg = "OWL ontology is logically inconsistent."
+            logger.error(msg)
+            msgs.append(msg)
+            return ValidationResult(valid=False, info_messages=msgs)
