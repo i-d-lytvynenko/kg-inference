@@ -46,6 +46,20 @@ packages = [{include = "src"}]
 [tool.poetry.group.dev.dependencies]
 basedpyright = "1.31.2"
 mlflow = "^3.3.2"
+pytest = "^8.4.2"
+pytest-asyncio = "^1.1.0"
+
+
+[tool.pytest.ini_options]
+testpaths = ["./tests"]
+filterwarnings = [
+    "ignore:::.*linkml.generators.common.template:47",
+    "ignore:::.*linkml.generators.common.template:86",
+    "ignore:::.*linkml.generators.pydanticgen.template:553",
+    "ignore:::.*pydantic._internal._config:323",
+    "ignore:::.*sssom_schema.datamodel.sssom_schema:20"
+]
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
