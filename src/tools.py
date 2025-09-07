@@ -28,7 +28,7 @@ from owlready2 import (
     Ontology,
     OwlReadyInconsistentOntologyError,
     OwlReadyOntologyParsingError,
-    get_ontology,
+    World,
     sync_reasoner,
 )
 from pydantic import BaseModel
@@ -416,9 +416,10 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
 
     with suppress_stderr():
         try:
+            world = World()
             onto = cast(
                 Ontology,
-                get_ontology(
+                world.get_ontology(
                     base_iri="http://www.example.org/philosophical_implications#"
                 ).load(fileobj=fileobj),
             )
