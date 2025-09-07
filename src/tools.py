@@ -447,7 +447,7 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
 
         try:
             with onto:
-                sync_reasoner(debug=False)
+                sync_reasoner(onto, debug=False)
 
             return ValidationResult(valid=True, info_messages=msgs)
         except OwlReadyInconsistentOntologyError:
