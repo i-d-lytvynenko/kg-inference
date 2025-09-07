@@ -12,13 +12,13 @@ import httpx
 import requests
 import yaml
 from duckduckgo_search import DDGS
+from jsonasobj2 import as_dict  # pyright: ignore[reportUnknownVariableType]
+from linkml.generators.pythongen import PythonGenerator
 from linkml.validator import validate
 from linkml_runtime.linkml_model import SchemaDefinition
-from linkml_runtime.loaders import yaml_loader
-from linkml_store.utils.format_utils import (
-    Format,
-    process_file,
-)
+from linkml_runtime.loaders import rdflib_loader, yaml_loader
+from linkml_runtime.utils.schemaview import SchemaView
+from linkml_runtime.utils.yamlutils import YAMLRoot
 from markdownify import markdownify
 from oaklib.interfaces.search_interface import SearchInterface
 from oaklib.selector import get_adapter
@@ -55,6 +55,9 @@ class WorkDir:
 
     location: str = field(default_factory=tempfile.gettempdir)
 
+    # NOTE:
+    # The user is responsible for deleting the temporary directory
+    # and its contents when done with it.
     @classmethod
     def create_temporary_workdir(cls) -> "WorkDir":
         temp_dir = tempfile.mkdtemp()
@@ -271,10 +274,7 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
         data_file: name of file
 
     Returns:
-        class ValidationResult(BaseModel):
-            valid: bool
-            info_messages: list[str] | None = None
-
+        ValidationResult
     """
     logger.info(f"Inspecting file: {data_file}")
     return ctx.deps.workdir.read_file(data_file)
@@ -290,10 +290,7 @@ async def validate_schema(
         schema_as_str: linkml schema (as yaml) to validate. Do not truncate, always pass the whole schema.
 
     Returns:
-        class ValidationResult(BaseModel):
-            valid: bool
-            info_messages: list[str] | None = None
-
+        ValidationResult
     """
     logger.info(f"Validating schema: {schema_as_str}")
     msgs: list[str] = []
@@ -323,43 +320,62 @@ async def validate_schema(
 
 async def validate_data(
     ctx: RunContext[HasSchema],
-    data: str,
-) -> str:
+    prefixes: str,
+    data: list[tuple[str, str]],
+) -> ValidationResult:
     """
     Validate data against the schema.
 
     Args:
-        data: extracted data in Turtle format.
+        prefixes: Turtle prefixes used in any triplets in data.
+        data: extracted data in Turtle format. Passed as a list of tuples ('ClassName', 'instance turtle code')
 
     Returns:
-        validation status message
-
+        ValidationResult
     """
     schema_path = ctx.deps.schema_path
     with open(schema_path, "r") as f:
         schema = f.read()
 
     logger.info(f"Validating data using schema: {schema}")
-    try:
-        parsed_schema = cast(
-            SchemaDefinition,
-            yaml_loader.loads(schema, target_class=SchemaDefinition),
-        )
-    except Exception as e:
-        return f"Schema does not validate: {e}"
-    try:
-        fileobj = io.StringIO(data)
-        instances = process_file(f=fileobj, format=Format.TURTLE)
+    parsed_schema = cast(
+        SchemaDefinition,
+        yaml_loader.loads(schema, target_class=SchemaDefinition),
+    )
 
-        for instance in instances:
+    gen = PythonGenerator(schema=parsed_schema)
+    schemaview = SchemaView(schema=parsed_schema)
+    python_module_str = gen.serialize()
+
+    local_namespace = {}
+    exec(python_module_str, local_namespace)  # pyright: ignore[reportUnknownArgumentType]
+
+    for class_name, instance_source in data:
+        try:
+            target_class = local_namespace[class_name]  # pyright: ignore[reportUnknownVariableType]
+        except KeyError:
+            raise ModelRetry(f"Class not in schema: {class_name}")
+        try:
+            instance_source = prefixes + "\n\n" + instance_source
+            instance = cast(
+                YAMLRoot,
+                rdflib_loader.loads(
+                    source=instance_source,
+                    target_class=target_class,  # pyright: ignore[reportUnknownArgumentType]
+                    schemaview=schemaview,
+                    allow_unprocessed_triples=False,
+                ),
+            )
             logger.info(f"Validating {instance}")
-            rpt = validate(instance, parsed_schema)
+            rpt = validate(as_dict(instance), parsed_schema)
             logger.info(f"Validation report: {rpt}")
             if rpt.results:
-                return f"Data does not validate:\n{rpt.results}"
-        return f"{len(instances)} instances all validate successfully"
-    except Exception as e:
-        raise ModelRetry(f"Data does not validate: {e}")
+                info_messages = [f"{instance}: {m.message} ({m.type})" for m in rpt.results]
+                return ValidationResult(valid=False, info_messages=info_messages)
+        except Exception as e:
+            raise ModelRetry(f"Data does not validate: {e}")
+
+    return ValidationResult(valid=True, info_messages=[])
 
 
 class DownloadResult(BaseModel):
@@ -411,7 +427,7 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
         owl_content: The OWL ontology content as a string in RDF/XML format.
 
     Returns:
-        ValidationResult: Indicates whether the OWL ontology is valid and consistent.
+        ValidationResult
     """
     logger.info("Validating OWL ontology.")
     msgs: list[str] = []
