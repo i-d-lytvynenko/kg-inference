@@ -17,9 +17,9 @@ from src.dependencies import (
 from src.tools import (
     inspect_file,
     logger,
+    lookup_external_ontology_terms,
+    lookup_project_ontology_terms,
     retrieve_web_page,
-    search_external_ontology,
-    search_project_ontology,
     search_web,
     validate_data,
     validate_owl_ontology,
@@ -137,13 +137,13 @@ def test_retrieve_web_page() -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_external_ontology() -> None:
+async def test_lookup_external_ontology_terms() -> None:
     with patch("src.tools.get_adapter") as mock_get_adapter:
         mock_adapter = MagicMock()
         mock_adapter.basic_search.return_value = ["ID:1", "ID:2"]
         mock_adapter.labels.return_value = [("ID:1", "Label 1"), ("ID:2", "Label 2")]
         mock_get_adapter.return_value = mock_adapter
-        results = await search_external_ontology("term", "ols:mondo")
+        results = await lookup_external_ontology_terms("term", "ols:mondo")
         assert results == [("ID:1", "Label 1"), ("ID:2", "Label 2")]
         mock_get_adapter.assert_called_once_with("ols:mondo")
         mock_adapter.basic_search.assert_called_once_with("term")
@@ -151,7 +151,7 @@ async def test_search_external_ontology() -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_project_ontology(
+async def test_lookup_project_ontology_terms(
     mock_run_context_has_data: RunContext[HasData],
 ) -> None:
     with patch(
@@ -159,7 +159,7 @@ async def test_search_project_ontology(
     ) as mock_search_external_ontology:
         mock_search_external_ontology.return_value = [("PROJ:1", "Project Term 1")]
         mock_run_context_has_data.deps.data_path = Path("my_ontology.owl")
-        results = await search_project_ontology(
+        results = await lookup_project_ontology_terms(
             mock_run_context_has_data, "project term"
         )
         assert results == [("PROJ:1", "Project Term 1")]

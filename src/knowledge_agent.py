@@ -7,8 +7,8 @@ from pydantic_ai import Agent
 
 from src.dependencies import HasData
 from src.tools import (
-    search_external_ontology,
-    search_project_ontology,
+    lookup_external_ontology_terms,
+    lookup_project_ontology_terms,
     search_web,
 )
 from src.utils import format_prompt
@@ -157,5 +157,9 @@ def get_knowledge_agent(model: str):
         output_retries=3,
         output_type=KnowledgeAgentOutput,
         system_prompt=system_prompt,
-        tools=[search_external_ontology, search_project_ontology, search_web],
+        tools=[
+            lookup_external_ontology_terms,
+            lookup_project_ontology_terms,
+            search_web,
+        ],
     )

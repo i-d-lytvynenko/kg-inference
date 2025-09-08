@@ -108,7 +108,7 @@ def retrieve_web_page(url: str) -> str:
         )
 
 
-async def search_external_ontology(
+async def lookup_external_ontology_terms(
     term: str,
     ontology: str,
     n: int = 10,
@@ -156,7 +156,7 @@ async def search_external_ontology(
     return results
 
 
-async def search_project_ontology(
+async def lookup_project_ontology_terms(
     ctx: RunContext[HasData],
     term: str,
     n: int = 10,
@@ -180,7 +180,7 @@ async def search_project_ontology(
     Returns:
         A list of tuples, each containing an ontology ID and a label.
     """
-    return await search_external_ontology(
+    return await lookup_external_ontology_terms(
         term=term,
         ontology=str(ctx.deps.data_path),
         n=n,
