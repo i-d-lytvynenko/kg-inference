@@ -5,8 +5,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
+from src.dependencies import HasData
 from src.tools import (
-    HasData,
     search_external_ontology,
     search_project_ontology,
     search_web,

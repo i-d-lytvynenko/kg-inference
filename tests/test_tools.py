@@ -8,11 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic_ai import RunContext
 
-from src.tools import (
+from src.dependencies import (
     HasData,
     HasSchema,
     HasWorkdir,
     WorkDir,
+)
+from src.tools import (
     inspect_file,
     logger,
     retrieve_web_page,
