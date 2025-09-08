@@ -38,6 +38,7 @@ def get_schema_agent(
         Always provide the schema in LinkML YAML.
         Before providing the user with a schema, you MUST ALWAYS validate it using the `validate_schema` tool.
         If there are mistakes, iterate on the schema until it validates.
+        Your final response should be ONLY the YAML content of the schema, without any additional text or markdown formatting.
     """)
 
     linkml_agent = Agent(
