@@ -13,21 +13,36 @@ async def generate_schema():
     agent = get_schema_agent(model=settings.schema_model_name)
 
     prompt = format_prompt("""
-        Create a LinkML schema for cognitive biases. The schema should include:
+**"The Office Supplies & People Tracker"**
 
-        1.  **Entities:**
-            *   `CognitiveBias`: A core entity representing a cognitive bias.
-            *   `SystematicError`: A type of error that can be associated with cognitive biases.
-            *   `DecisionProcess`: Represents a process where decisions are made.
-            *   `SuboptimalDecision`: Represents a decision that is not optimal.
+Imagine we're building a tiny system to keep track of a few things in a small office. Our ontology is super basic, focusing on some common office items and the people who might use them.
 
-        2.  **Relationships:**
-            *   `is_a`: Standard inheritance relationship (e.g., CognitiveBias is_a SystematicError).
-            *   `leads_to`: Connects a cause to an effect (e.g., SystematicError leads_to SuboptimalDecision).
-            *   `exhibits`: Connects a DecisionProcess to a CognitiveBias (e.g., DecisionProcess exhibits ConfirmationBias).
-            *   `is_prone_to`: Connects a DecisionProcess to a SuboptimalDecision (this will be inferred).
+Here's what our world looks like:
 
-        Ensure the schema is well-structured and includes appropriate types and slots for these entities and relationships.
+**1. Main "Categories" or "Types of Things" (Classes):**
+
+*   **`Person`**: This is for any individual in our office. Think "human being."
+*   **`OfficeItem`**: This is a very general category for anything that exists in the office that isn't a person.
+*   **`WritingTool`**: This is a specific kind of `OfficeItem` that you use to write with.
+*   **`ElectronicDevice`**: Another specific kind of `OfficeItem`, something that needs power or batteries.
+*   **`Desk`**: A piece of furniture found in an office, where someone might work.
+
+**2. How These Categories Relate (Class Hierarchies - "is a kind of"):**
+
+*   A `WritingTool` **is a kind of** `OfficeItem`. (So, if something's a writing tool, it's definitely an office item.)
+*   An `ElectronicDevice` **is a kind of** `OfficeItem`. (Similar to above, electronics are office items.)
+
+**3. Ways Things Interact or Connect (Properties/Relationships):**
+
+*   **`uses`**: This is a relationship between a `Person` and an `OfficeItem`. For example, "John `uses` a pen."
+*   **`has`**: This is a relationship from a `Person` to a `Desk`. For example, "Alice `has` a desk."
+*   **`locatedOn`**: This is a relationship from an `OfficeItem` to a `Desk`. For example, "The stapler `locatedOn` John's desk."
+*   **`requiresPower`**: This is a characteristic or attribute that an `ElectronicDevice` *might* have. We'll treat this as a simple true/false property for now, but really it just flags that it's a thing that needs power. (This is almost a data property, but we can model it as an object property to a placeholder 'PowerSource' if we wanted, but for simplicity, let's think of it as a flag on `ElectronicDevice` for now.)
+
+**4. Some Basic Rules or "Facts" About Our World (Axioms/Constraints - but keep it simple):**
+
+*   **Implicit Rule 1 (from hierarchy):** If something is a `WritingTool`, it *must* also be an `OfficeItem`.
+*   **Implicit Rule 2 (from hierarchy):** If something is an `ElectronicDevice`, it *must* also be an `OfficeItem`.
     """)
 
     print("Generating LinkML schema...")
