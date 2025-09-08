@@ -5,9 +5,9 @@ from src.schema_agent import get_config, get_schema_agent
 from src.utils import format_prompt
 
 
-async def generate_schema():
+async def generate_schema() -> None:
     """
-    Generates a LinkML schema for cognitive biases using the Schema agent.
+    Generates a LinkML schema using the Schema agent.
     """
     settings = get_settings()
     agent = get_schema_agent(model=settings.schema_model_name)
