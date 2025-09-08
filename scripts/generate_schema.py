@@ -53,7 +53,7 @@ Here's what our world looks like:
     print(schema)
 
     schema_file = settings.schema_path
-    schema_file.mkdir(exist_ok=True)
+    schema_file.parent.mkdir(exist_ok=True, parents=True)
     schema_file.write_text(schema)
     print(f"\nSchema saved to {schema_file.absolute()}")
 
