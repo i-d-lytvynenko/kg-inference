@@ -48,7 +48,7 @@ async def search_web(query: str) -> list[SearchResult]:
     Search the web using a text query.
 
     If you get no results, try a less restrictive/shorter query.
-    Note, this will not retrieve the full content, for that you should use retrieve_web_page tool.
+    Note, this will not retrieve the full page content.
 
     Example:
         >>> result = web_search("Winner of 2024 nobel prize in chemistry")

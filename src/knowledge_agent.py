@@ -9,7 +9,10 @@ from src.dependencies import HasData
 from src.tools import (
     lookup_external_ontology_terms,
     lookup_project_ontology_terms,
+    retrieve_web_page,
     search_web,
+    validate_data,
+    validate_owl_ontology,
 )
 from src.utils import format_prompt
 
@@ -161,5 +164,8 @@ def get_knowledge_agent(model: str):
             lookup_external_ontology_terms,
             lookup_project_ontology_terms,
             search_web,
+            retrieve_web_page,
+            validate_data,
+            validate_owl_ontology,
         ],
     )
