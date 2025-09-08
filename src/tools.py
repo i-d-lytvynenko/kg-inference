@@ -27,7 +27,7 @@ from owlready2 import (
     OwlReadyInconsistentOntologyError,
     OwlReadyOntologyParsingError,
     World,
-    sync_reasoner,
+    sync_reasoner_pellet,
 )
 from pydantic_ai import ModelRetry, RunContext
 
@@ -144,7 +144,7 @@ async def lookup_external_ontology_terms(
         results = adapter.basic_search(term)
         results = list(adapter.labels(results))
     except (ValueError, URLError, KeyError):
-        logger.warning(
+        logger.info(
             f"Unable to search ontology '{ontology}' - unknown url type: '{ontology}'"
         )
         return []
@@ -239,7 +239,7 @@ async def validate_schema(
             yaml_loader.loads(schema_as_str, target_class=SchemaDefinition),
         )
     except Exception as e:
-        logger.error(f"Invalid schema: {schema_as_str}")
+        logger.info(f"Invalid schema: {schema_as_str}")
         msgs.append(f"Schema does not validate: {e}")
         return ValidationResult(valid=False, info_messages=msgs)
     return ValidationResult(valid=True, info_messages=msgs)
@@ -352,7 +352,7 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
             logger.info("Successfully loaded OWL ontology.")
         except OwlReadyOntologyParsingError as e:
             msg = f"Error parsing OWL content: {e}"
-            logger.error(msg)
+            logger.info(msg)
             msgs.append(msg)
             return ValidationResult(valid=False, info_messages=msgs)
 
@@ -373,11 +373,17 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
 
         try:
             with onto:
-                sync_reasoner(onto, debug=False)
+                sync_reasoner_pellet(onto, debug=2)
 
             return ValidationResult(valid=True, info_messages=msgs)
-        except OwlReadyInconsistentOntologyError:
-            msg = "OWL ontology is logically inconsistent."
-            logger.error(msg)
+        except OwlReadyInconsistentOntologyError as e:
+            error_message = str(e)
+            marker = "\nThis is the output of `pellet explain`:"
+            start_index = error_message.find(marker)
+            if start_index != -1:
+                error_message = error_message[start_index + len(marker):]
+
+            msg = f"OWL ontology is logically inconsistent. Pellet output: {error_message}."
+            logger.info(msg)
             msgs.append(msg)
             return ValidationResult(valid=False, info_messages=msgs)
