@@ -31,7 +31,6 @@ from owlready2 import (
     World,
     sync_reasoner,
 )
-from pydantic import BaseModel
 from pydantic_ai import ModelRetry, RunContext
 
 logger = logging.getLogger(__name__)
@@ -122,12 +121,19 @@ class HasData:
     data_path: Path
 
 
-async def search_web(query: str) -> str:
+@dataclass(frozen=True)
+class SearchResult:
+    title: str
+    href: str
+    summary: str
+
+
+async def search_web(query: str) -> list[SearchResult]:
     """
     Search the web using a text query.
 
-    Note, this will not retrieve the full content, for that you
-    should use retrieve_web_page tool.
+    If you get no results, try a less restrictive/shorter query.
+    Note, this will not retrieve the full content, for that you should use retrieve_web_page tool.
 
     Example:
         >>> result = web_search("Winner of 2024 nobel prize in chemistry")
@@ -140,13 +146,17 @@ async def search_web(query: str) -> str:
         Matching web pages plus summaries
     """
     ddgs = DDGS()
-    results = ddgs.text(query, max_results=10)
-    if len(results) == 0:
-        return "No results found! Try a less restrictive/shorter query."
-    postprocessed_results = [
-        f"[{result['title']}]({result['href']})\n{result['body']}" for result in results
-    ]
-    return "## Search Results\n\n" + "\n\n".join(postprocessed_results)
+    search_results: list[SearchResult] = []
+    for result in ddgs.text(query, max_results=10):
+        search_results.append(
+            SearchResult(
+                title=result.get("title", "N/A"),
+                href=result.get("href", "N/A"),
+                summary=result.get("body", "N/A"),
+            )
+        )
+
+    return search_results
 
 
 def retrieve_web_page(url: str) -> str:
@@ -262,7 +272,8 @@ async def search_project_ontology(
     )
 
 
-class ValidationResult(BaseModel):
+@dataclass(frozen=True)
+class ValidationResult:
     valid: bool
     info_messages: list[str]
 

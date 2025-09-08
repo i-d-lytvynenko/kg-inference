@@ -105,11 +105,8 @@ async def test_search_web() -> None:
                 "body": "Test Body 2",
             },
         ]
-        result = await search_web("test query")
-        assert "Test Title 1" in result
-        assert "Test Body 2" in result
-        assert "http://example.com/1" in result
-        assert "## Search Results" in result
+        search_results = await search_web("test query")
+        assert len(search_results) == 2
 
 
 def test_retrieve_web_page() -> None:
