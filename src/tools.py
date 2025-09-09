@@ -13,6 +13,7 @@ import requests
 import yaml
 from duckduckgo_search import DDGS
 from jsonasobj2 import as_dict  # pyright: ignore[reportUnknownVariableType]
+from linkml.generators.owlgen import OwlSchemaGenerator
 from linkml.generators.pythongen import PythonGenerator
 from linkml.validator import validate
 from linkml_runtime.linkml_model import SchemaDefinition
@@ -144,10 +145,9 @@ async def lookup_external_ontology_terms(
         results = adapter.basic_search(term)
         results = list(adapter.labels(results))
     except (ValueError, URLError, KeyError):
-        logger.info(
+        raise ModelRetry(
             f"Unable to search ontology '{ontology}' - unknown url type: '{ontology}'"
         )
-        return []
     if n:
         results = list(results)[:n]
 
@@ -187,12 +187,6 @@ async def lookup_project_ontology_terms(
     )
 
 
-@dataclass(frozen=True)
-class ValidationResult:
-    valid: bool
-    info_messages: list[str]
-
-
 async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
     """
     Inspect a file in the working directory.
@@ -201,7 +195,7 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
         data_file: name of file
 
     Returns:
-        ValidationResult
+        File content
     """
     logger.info(f"Inspecting file: {data_file}")
     return ctx.deps.workdir.read_file(data_file)
@@ -209,30 +203,29 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
 
 async def validate_schema(
     schema_as_str: str,
-) -> ValidationResult:
+) -> None:
     """
-    Validate a LinkML schema.
+    Validate a LinkML schema and save if successful.
 
     Args:
         schema_as_str: linkml schema (as yaml) to validate. Do not truncate, always pass the whole schema.
 
     Returns:
-        ValidationResult
+        None
     """
     logger.info(f"Validating schema: {schema_as_str}")
-    msgs: list[str] = []
     try:
         schema_dict = cast(dict[str, Any], yaml.safe_load(schema_as_str))
         logger.info("YAML is valid")
     except Exception as e:
-        msgs.append(f"Schema is not valid yaml: {e}")
-        return ValidationResult(valid=False, info_messages=msgs)
+        raise ModelRetry(f"Schema is not valid yaml: {e}")
+    msgs: list[str] = []
     if "id" not in schema_dict:
         msgs.append("Schema does not have a top level id")
     if "name" not in schema_dict:
         msgs.append("Schema does not have a top level name")
     if msgs:
-        return ValidationResult(valid=False, info_messages=msgs)
+        raise ModelRetry("\n".join(msgs))
     try:
         _ = cast(
             SchemaDefinition,
@@ -241,37 +234,34 @@ async def validate_schema(
     except Exception as e:
         logger.info(f"Invalid schema: {schema_as_str}")
         msgs.append(f"Schema does not validate: {e}")
-        return ValidationResult(valid=False, info_messages=msgs)
-    return ValidationResult(valid=True, info_messages=msgs)
+        raise ModelRetry(f"Schema does not validate: {e}")
 
 
 async def validate_data(
     ctx: RunContext[HasSchema],
     prefixes: str,
     data: list[tuple[str, str]],
-) -> ValidationResult:
+) -> None:
     """
-    Validate data against the schema.
+    Validate data against the schema and save if successful.
 
     Args:
         prefixes: Turtle prefixes used in any triplets in data.
         data: extracted data in Turtle format. Passed as a list of tuples ('ClassName', 'instance turtle code')
 
     Returns:
-        ValidationResult
+        None
     """
-    schema_path = ctx.deps.schema_path
-    with open(schema_path, "r") as f:
-        schema = f.read()
+    linkml_schema_str = ctx.deps.schema_path.read_text()
 
-    logger.info(f"Validating data using schema: {schema}")
-    parsed_schema = cast(
+    logger.info(f"Validating data using schema: {linkml_schema_str}")
+    linkml_schema = cast(
         SchemaDefinition,
-        yaml_loader.loads(schema, target_class=SchemaDefinition),
+        yaml_loader.loads(linkml_schema_str, target_class=SchemaDefinition),
     )
 
-    gen = PythonGenerator(schema=parsed_schema)
-    schemaview = SchemaView(schema=parsed_schema)
+    gen = PythonGenerator(schema=linkml_schema)
+    schemaview = SchemaView(schema=linkml_schema)
     python_module_str = gen.serialize()
 
     local_namespace = {}
@@ -294,17 +284,15 @@ async def validate_data(
                 ),
             )
             logger.info(f"Validating {instance}")
-            rpt = validate(as_dict(instance), parsed_schema)
+            rpt = validate(as_dict(instance), linkml_schema)
             logger.info(f"Validation report: {rpt}")
             if rpt.results:
                 info_messages = [
                     f"{instance}: {m.message} ({m.type})" for m in rpt.results
                 ]
-                return ValidationResult(valid=False, info_messages=info_messages)
+                raise ModelRetry("\n".join(info_messages))
         except Exception as e:
             raise ModelRetry(f"Data does not validate: {e}")
-
-    return ValidationResult(valid=True, info_messages=[])
 
 
 # Because owlready2 is a joke
@@ -319,26 +307,41 @@ def suppress_stderr():
             sys.stderr = old_stderr
 
 
-async def validate_owl_ontology(owl_content: str) -> ValidationResult:
+async def validate_owl_ontology(
+    ctx: RunContext[HasData],
+    rdf_triplets: str,
+) -> None:
     """
-    Validate an OWL ontology for parsing errors and logical consistency.
+    Validate new data against an OWL ontology for logical consistency and save if successful.
 
     Args:
-        owl_content: The OWL ontology content as a string in RDF/XML format.
+        rdf_triplets: Data content as a string in RDF/XML format.
 
     Returns:
-        ValidationResult
+        None
     """
     logger.info("Validating OWL ontology.")
-    msgs: list[str] = []
 
-    owl_content = owl_content.strip()
+    rdf_triplets = rdf_triplets.strip()
     pattern = r"```(?:xml|owl|rdf)?\s*([\s\S]*?)```"
-    matches = re.findall(pattern, owl_content, re.IGNORECASE)
+    matches = re.findall(pattern, rdf_triplets, re.IGNORECASE)
     if matches:
-        owl_content = "\n\n".join(matches)
+        rdf_triplets = "\n\n".join(matches)
 
-    fileobj = io.BytesIO(str.encode(owl_content))
+    linkml_schema_str = ctx.deps.schema_path.read_text()
+
+    prev_rdf_triplets: str | None = None
+    if ctx.deps.data_path.exists():
+        prev_rdf_triplets = ctx.deps.data_path.read_text()
+
+    linkml_schema = cast(
+        SchemaDefinition,
+        yaml_loader.loads(linkml_schema_str, target_class=SchemaDefinition),
+    )
+
+    # schemaview = SchemaView(schema=linkml_schema)
+    gen = OwlSchemaGenerator(schema=linkml_schema)
+    owl_schema_str = gen.serialize()
 
     with suppress_stderr():
         try:
@@ -347,14 +350,16 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
                 Ontology,
                 world.get_ontology(
                     base_iri="http://www.example.org/philosophical_implications#"
-                ).load(fileobj=fileobj),
+                ).load(fileobj=io.BytesIO(str.encode(owl_schema_str))),
             )
-            logger.info("Successfully loaded OWL ontology.")
+
+            if prev_rdf_triplets is not None:
+                onto.load(fileobj=io.BytesIO(str.encode(prev_rdf_triplets)))
+
+            onto.load(fileobj=io.BytesIO(str.encode(rdf_triplets)))
+            logger.info("Successfully loaded OWL ontology with new data.")
         except OwlReadyOntologyParsingError as e:
-            msg = f"Error parsing OWL content: {e}"
-            logger.info(msg)
-            msgs.append(msg)
-            return ValidationResult(valid=False, info_messages=msgs)
+            raise ModelRetry(f"Error parsing OWL content: {e}")
 
         if logger.getEffectiveLevel() <= logging.DEBUG:
             classes = list(onto.classes())  # pyright: ignore[reportUnknownArgumentType]
@@ -375,15 +380,18 @@ async def validate_owl_ontology(owl_content: str) -> ValidationResult:
             with onto:
                 sync_reasoner_pellet(onto, debug=2)
 
-            return ValidationResult(valid=True, info_messages=msgs)
         except OwlReadyInconsistentOntologyError as e:
             error_message = str(e)
             marker = "\nThis is the output of `pellet explain`:"
             start_index = error_message.find(marker)
             if start_index != -1:
-                error_message = error_message[start_index + len(marker):]
+                error_message = error_message[start_index + len(marker) :]
 
-            msg = f"OWL ontology is logically inconsistent. Pellet output: {error_message}."
-            logger.info(msg)
-            msgs.append(msg)
-            return ValidationResult(valid=False, info_messages=msgs)
+            raise ModelRetry(
+                f"OWL ontology is logically inconsistent. Pellet output: {error_message}."
+            )
+
+    if prev_rdf_triplets is not None:
+        ctx.deps.data_path.write_text(prev_rdf_triplets + "\n\n" + rdf_triplets)
+    else:
+        ctx.deps.data_path.write_text(rdf_triplets)
