@@ -1,4 +1,5 @@
-from pydantic_ai import Agent, Tool
+from pydantic_ai import Agent
+from pydantic_ai.output import ToolOutput
 
 from src.tools import validate_schema
 from src.utils import format_prompt
@@ -23,7 +24,7 @@ def get_config() -> SchemaDependencies:
 
 def get_schema_agent(
     model: str,
-) -> Agent[SchemaDependencies, str]:
+) -> Agent[SchemaDependencies, None]:
     """Initialize the Schema Agent.
 
     Args:
@@ -44,9 +45,7 @@ def get_schema_agent(
     linkml_agent = Agent(
         model=model,
         deps_type=SchemaDependencies,
-        tools=[
-            Tool(validate_schema, max_retries=5),
-        ],
+        output_type=ToolOutput(validate_schema, max_retries=5),
         system_prompt=system_prompt,
     )
     return linkml_agent
