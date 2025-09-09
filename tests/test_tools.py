@@ -1,12 +1,11 @@
 import logging
-import shutil
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pydantic_ai import RunContext
+from pydantic_ai import ModelRetry, RunContext
 
 from src.dependencies import (
     HasData,
@@ -43,52 +42,23 @@ def mock_run_context_has_workdir(temp_workdir: WorkDir) -> RunContext[HasWorkdir
 
 
 @pytest.fixture
-def mock_run_context_has_schema() -> RunContext[HasSchema]:
+def mock_run_context_has_schema(temp_workdir: WorkDir) -> RunContext[HasSchema]:
     mock_context = MagicMock(spec=RunContext)
-    mock_context.deps = HasSchema(schema_path=Path("mock_schema.yaml"))
+    schema_path = Path(temp_workdir.location) / "mock_schema.yaml"
+    mock_context.deps = HasSchema(schema_path=schema_path)
     return mock_context
 
 
 @pytest.fixture
-def mock_run_context_has_data() -> RunContext[HasData]:
+def mock_run_context_has_data(
+    mock_run_context_has_schema: RunContext[HasSchema], temp_workdir: WorkDir
+) -> RunContext[HasData]:
     mock_context = MagicMock(spec=RunContext)
-    mock_context.deps = HasData(data_path=Path("mock_data.ttl"))
+    data_path = Path(temp_workdir.location) / "mock_data.ttl"
+    mock_context.deps = HasData(
+        data_path=data_path, schema_path=mock_run_context_has_schema.deps.schema_path
+    )
     return mock_context
-
-
-class TestWorkDir:
-    def test_create_temporary_workdir(self) -> None:
-        wd = WorkDir.create_temporary_workdir()
-        assert Path(wd.location).is_dir()
-        assert "tmp" in wd.location
-        # Clean up the created directory
-        shutil.rmtree(wd.location)
-
-    def test_get_file_path(self, temp_workdir: WorkDir) -> None:
-        file_path = temp_workdir.get_file_path("test.txt")
-        assert file_path == Path(temp_workdir.location) / "test.txt"
-
-    def test_write_and_read_file(self, temp_workdir: WorkDir) -> None:
-        temp_workdir.write_file("test.txt", "Hello, world!")
-        content = temp_workdir.read_file("test.txt")
-        assert content == "Hello, world!"
-
-    def test_check_file_exists(self, temp_workdir: WorkDir) -> None:
-        assert not temp_workdir.check_file_exists("test.txt")
-        temp_workdir.write_file("test.txt", "Hello, world!")
-        assert temp_workdir.check_file_exists("test.txt")
-
-    def test_delete_file(self, temp_workdir: WorkDir) -> None:
-        temp_workdir.write_file("test.txt", "Hello, world!")
-        assert temp_workdir.check_file_exists("test.txt")
-        temp_workdir.delete_file("test.txt")
-        assert not temp_workdir.check_file_exists("test.txt")
-
-    def test_list_file_names(self, temp_workdir: WorkDir) -> None:
-        temp_workdir.write_file("file1.txt", "content1")
-        temp_workdir.write_file("file2.txt", "content2")
-        files = temp_workdir.list_file_names()
-        assert sorted(files) == ["file1.txt", "file2.txt"]
 
 
 @pytest.mark.asyncio
@@ -155,16 +125,16 @@ async def test_lookup_project_ontology_terms(
     mock_run_context_has_data: RunContext[HasData],
 ) -> None:
     with patch(
-        "src.tools.search_external_ontology", new_callable=AsyncMock
-    ) as mock_search_external_ontology:
-        mock_search_external_ontology.return_value = [("PROJ:1", "Project Term 1")]
+        "src.tools.lookup_external_ontology_terms", new_callable=AsyncMock
+    ) as mock_lookup_external:
+        mock_lookup_external.return_value = [("PROJ:1", "Project Term 1")]
         mock_run_context_has_data.deps.data_path = Path("my_ontology.owl")
         results = await lookup_project_ontology_terms(
             mock_run_context_has_data, "project term"
         )
         assert results == [("PROJ:1", "Project Term 1")]
-        mock_search_external_ontology.assert_called_once_with(
-            term="project term", ontology="my_ontology.owl", n=10
+        mock_lookup_external.assert_called_once_with(
+            term="project term", ontology=str(Path("my_ontology.owl")), n=10
         )
 
 
@@ -190,9 +160,7 @@ async def test_validate_schema_valid() -> None:
               name:
                 range: string
     """
-    result = await validate_schema(valid_schema)
-    assert result.valid is True
-    assert result.info_messages == []
+    await validate_schema(valid_schema)
 
 
 @pytest.mark.asyncio
@@ -201,10 +169,8 @@ async def test_validate_schema_invalid_yaml() -> None:
         id: http://example.com/test_schema
           name: test_schema
     """
-    result = await validate_schema(invalid_schema)
-    assert result.valid is False
-    assert result.info_messages is not None
-    assert "Schema is not valid yaml" in result.info_messages[0]
+    with pytest.raises(ModelRetry, match="Schema is not valid yaml"):
+        await validate_schema(invalid_schema)
 
 
 @pytest.mark.asyncio
@@ -216,16 +182,15 @@ async def test_validate_schema_missing_id_name() -> None:
               name:
                 range: string
     """
-    result = await validate_schema(invalid_schema)
-    assert result.valid is False
-    assert result.info_messages is not None
-    assert "Schema does not have a top level id" in result.info_messages
-    assert "Schema does not have a top level name" in result.info_messages
+    with pytest.raises(ModelRetry) as e:
+        await validate_schema(invalid_schema)
+    assert "Schema does not have a top level id" in str(e.value)
+    assert "Schema does not have a top level name" in str(e.value)
 
 
 @pytest.mark.asyncio
 async def test_validate_data_valid(
-    mock_run_context_has_schema: RunContext[HasSchema], temp_workdir: WorkDir
+    mock_run_context_has_schema: RunContext[HasSchema],
 ) -> None:
     schema_content = """
         id: https://w3id.org/linkml/examples/personinfo
@@ -254,13 +219,6 @@ async def test_validate_data_valid(
                 maximum_value: 120
     """
     prefixes = """
-        @prefix : <https://w3id.org/linkml/examples/personinfo#> .
-        @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-        @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-    """
-
-    prefixes = """
         @prefix ORCID: <https://orcid.org/> .
         @prefix personinfo: <https://w3id.org/linkml/examples/personinfo/> .
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -269,28 +227,25 @@ async def test_validate_data_valid(
     data = [
         (
             "Person",
-            """
+            '''
                 ORCID:1234 a personinfo:Person ;
                     personinfo:age 30 ;
                     personinfo:full_name "Clark Kent" .
-            """,
+            ''',
         )
     ]
-    schema_path = temp_workdir.get_file_path("mock_schema.yaml")
-    temp_workdir.write_file(str(schema_path), schema_content)
-    mock_run_context_has_schema.deps.schema_path = schema_path
+    mock_run_context_has_schema.deps.schema_path.write_text(schema_content)
 
-    result = await validate_data(
+    await validate_data(
         ctx=mock_run_context_has_schema,
         prefixes=prefixes,
         data=data,
     )
-    assert result.valid
 
 
 @pytest.mark.asyncio
 async def test_validate_data_invalid(
-    mock_run_context_has_schema: RunContext[HasSchema], temp_workdir: WorkDir
+    mock_run_context_has_schema: RunContext[HasSchema],
 ) -> None:
     schema_content = """
         id: https://w3id.org/linkml/examples/personinfo
@@ -319,13 +274,6 @@ async def test_validate_data_invalid(
                 maximum_value: 120
     """
     prefixes = """
-        @prefix : <https://w3id.org/linkml/examples/personinfo#> .
-        @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-        @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-    """
-
-    prefixes = """
         @prefix ORCID: <https://orcid.org/> .
         @prefix personinfo: <https://w3id.org/linkml/examples/personinfo/> .
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -334,27 +282,46 @@ async def test_validate_data_invalid(
     data = [
         (
             "Person",
-            """
+            '''
                 ORCID:1234 a personinfo:Person ;
                     personinfo:age 330 ;
                     personinfo:full_name "Clark Kent" .
-            """,
+            ''',
         )
     ]
-    schema_path = temp_workdir.get_file_path("mock_schema.yaml")
-    temp_workdir.write_file(str(schema_path), schema_content)
-    mock_run_context_has_schema.deps.schema_path = schema_path
+    mock_run_context_has_schema.deps.schema_path.write_text(schema_content)
 
-    result = await validate_data(
-        ctx=mock_run_context_has_schema,
-        prefixes=prefixes,
-        data=data,
-    )
-    assert not result.valid
+    with pytest.raises(ModelRetry, match="Data does not validate"):
+        await validate_data(
+            ctx=mock_run_context_has_schema,
+            prefixes=prefixes,
+            data=data,
+        )
 
 
 @pytest.mark.asyncio
-async def test_validate_owl_ontology_valid() -> None:
+async def test_validate_owl_ontology_valid(
+    mock_run_context_has_data: RunContext[HasData],
+) -> None:
+    schema_content = """
+        id: http://www.example.org/philosophical_implications#
+        name: philosophical_implications
+        prefixes:
+          linkml: https://w3id.org/linkml/
+          philosophical_implications: http://www.example.org/philosophical_implications#
+        imports:
+          - linkml:types
+        default_prefix: philosophical_implications
+        default_range: string
+
+        classes:
+          Concept:
+            attributes:
+              id:
+                identifier: true
+    """
+    mock_run_context_has_data.deps.schema_path.write_text(schema_content)
+
     valid_owl = """
         <rdf:RDF xmlns="http://www.example.org/philosophical_implications#"
             xml:base="http://www.example.org/philosophical_implications#"
@@ -367,12 +334,24 @@ async def test_validate_owl_ontology_valid() -> None:
             <owl:Class rdf:about="http://www.example.org/philosophical_implications#Concept"/>
         </rdf:RDF>
     """
-    result = await validate_owl_ontology(valid_owl)
-    assert result.valid
+    await validate_owl_ontology(mock_run_context_has_data, valid_owl)
 
 
 @pytest.mark.asyncio
-async def test_validate_owl_ontology_invalid_syntax() -> None:
+async def test_validate_owl_ontology_invalid_syntax(
+    mock_run_context_has_data: RunContext[HasData],
+) -> None:
+    schema_content = """
+        id: http://www.example.org/philosophical_implications#
+        name: philosophical_implications
+        default_prefix: philosophical_implications
+        classes:
+          Concept:
+            attributes:
+              id:
+                identifier: true
+    """
+    mock_run_context_has_data.deps.schema_path.write_text(schema_content)
     invalid_owl = """
         <rdf:RDF xmlns="http://www.example.org/philosophical_implications#"
             xml:base="http://www.example.org/philosophical_implications#"
@@ -385,12 +364,25 @@ async def test_validate_owl_ontology_invalid_syntax() -> None:
             <owl:Class rdf:about="http://www.example.org/philosophical_implications#Concept"/>
         </rdf:RDF
     """  # Missing closing tag
-    result = await validate_owl_ontology(invalid_owl)
-    assert not result.valid
+    with pytest.raises(ModelRetry, match="Error parsing OWL content"):
+        await validate_owl_ontology(mock_run_context_has_data, invalid_owl)
 
 
 @pytest.mark.asyncio
-async def test_validate_owl_ontology_inconsistent() -> None:
+async def test_validate_owl_ontology_inconsistent(
+    mock_run_context_has_data: RunContext[HasData],
+) -> None:
+    schema_content = """
+        id: http://www.example.org/philosophical_implications#
+        name: philosophical_implications
+        default_prefix: philosophical_implications
+        classes:
+          Concept:
+            attributes:
+              id:
+                identifier: true
+    """
+    mock_run_context_has_data.deps.schema_path.write_text(schema_content)
     inconsistent_owl = """
         <rdf:RDF xmlns="http://www.example.org/philosophical_implications#"
             xml:base="http://www.example.org/philosophical_implications#"
@@ -409,5 +401,5 @@ async def test_validate_owl_ontology_inconsistent() -> None:
             </owl:Class>
         </rdf:RDF>
     """
-    result = await validate_owl_ontology(inconsistent_owl)
-    assert not result.valid
+    with pytest.raises(ModelRetry, match="OWL ontology is logically inconsistent"):
+        await validate_owl_ontology(mock_run_context_has_data, inconsistent_owl)
