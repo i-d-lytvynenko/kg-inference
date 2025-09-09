@@ -84,5 +84,5 @@ class HasSchema:
 
 
 @dataclass
-class HasData:
+class HasData(HasSchema):
     data_path: Path
