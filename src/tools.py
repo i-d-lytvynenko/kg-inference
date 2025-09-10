@@ -24,7 +24,6 @@ from markdownify import markdownify
 from oaklib.interfaces.search_interface import SearchInterface
 from oaklib.selector import get_adapter
 from owlready2 import (
-    Ontology,
     OwlReadyInconsistentOntologyError,
     OwlReadyOntologyParsingError,
     World,
@@ -345,30 +344,31 @@ async def validate_owl_ontology(
     with suppress_stderr():
         try:
             world = World()
-            onto = cast(
-                Ontology,
-                world.get_ontology(base_iri=linkml_schema.id).load(
-                    fileobj=io.BytesIO(str.encode(owl_schema_str))
-                ),
+            world.get_ontology(base_iri=linkml_schema.id).load(
+                fileobj=io.BytesIO(str.encode(owl_schema_str))
             )
 
             if prev_rdf_triplets is not None:
-                onto.load(fileobj=io.BytesIO(str.encode(prev_rdf_triplets)))
+                world.get_ontology(base_iri="http://example.org/prev_data#").load(
+                    fileobj=io.BytesIO(str.encode(prev_rdf_triplets))
+                ),
 
-            onto.load(fileobj=io.BytesIO(str.encode(rdf_triplets)))
+            world.get_ontology(base_iri="http://example.org/new_data#").load(
+                fileobj=io.BytesIO(str.encode(rdf_triplets))
+            ),
             logger.info("Successfully loaded OWL ontology with new data.")
         except OwlReadyOntologyParsingError as e:
             raise ModelRetry(f"Error parsing OWL content: {e}")
 
         if logger.getEffectiveLevel() <= logging.DEBUG:
-            classes = list(onto.classes())  # pyright: ignore[reportUnknownArgumentType]
+            classes = list(world.classes())  # pyright: ignore[reportUnknownArgumentType]
             logger.debug(f"  - {len(classes)} OWL Classes found:")  # pyright: ignore[reportUnknownArgumentType]
             for cls in classes:
                 logger.debug(
                     f"    - {cls.iri} (Label: {cls.label.first() if cls.label else 'N/A'})"
                 )
 
-            object_properties = list(onto.object_properties())  # pyright: ignore[reportUnknownArgumentType]
+            object_properties = list(world.object_properties())  # pyright: ignore[reportUnknownArgumentType]
             logger.debug(f"  - {len(object_properties)} OWL Object Properties found:")  # pyright: ignore[reportUnknownArgumentType]
             for prop in object_properties:
                 logger.debug(
@@ -376,8 +376,8 @@ async def validate_owl_ontology(
                 )
 
         try:
-            with onto:
-                sync_reasoner_pellet(onto, debug=2)
+            with world:
+                sync_reasoner_pellet(world, debug=2)
 
         except OwlReadyInconsistentOntologyError as e:
             error_message = str(e)
