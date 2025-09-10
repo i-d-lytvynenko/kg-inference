@@ -227,11 +227,11 @@ async def test_validate_data_valid(
     data = [
         (
             "Person",
-            '''
+            """
                 ORCID:1234 a personinfo:Person ;
                     personinfo:age 30 ;
                     personinfo:full_name "Clark Kent" .
-            ''',
+            """,
         )
     ]
     mock_run_context_has_schema.deps.schema_path.write_text(schema_content)
@@ -282,11 +282,11 @@ async def test_validate_data_invalid(
     data = [
         (
             "Person",
-            '''
+            """
                 ORCID:1234 a personinfo:Person ;
                     personinfo:age 330 ;
                     personinfo:full_name "Clark Kent" .
-            ''',
+            """,
         )
     ]
     mock_run_context_has_schema.deps.schema_path.write_text(schema_content)
