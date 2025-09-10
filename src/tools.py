@@ -339,8 +339,7 @@ async def validate_owl_ontology(
         yaml_loader.loads(linkml_schema_str, target_class=SchemaDefinition),
     )
 
-    # schemaview = SchemaView(schema=linkml_schema)
-    gen = OwlSchemaGenerator(schema=linkml_schema)
+    gen = OwlSchemaGenerator(schema=linkml_schema, format="xml")
     owl_schema_str = gen.serialize()
 
     with suppress_stderr():
