@@ -33,6 +33,7 @@ reportImplicitStringConcatenation = "none"
 reportUnusedCallResult = "none"
 reportAny = "hint"
 reportMissingTypeStubs = "none"
+reportUnusedExpression = "none"
 
 
 [tool.ruff]
