@@ -348,9 +348,9 @@ async def validate_owl_ontology(
             world = World()
             onto = cast(
                 Ontology,
-                world.get_ontology(
-                    base_iri="http://www.example.org/philosophical_implications#"
-                ).load(fileobj=io.BytesIO(str.encode(owl_schema_str))),
+                world.get_ontology(base_iri=linkml_schema.id).load(
+                    fileobj=io.BytesIO(str.encode(owl_schema_str))
+                ),
             )
 
             if prev_rdf_triplets is not None:
