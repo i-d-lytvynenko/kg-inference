@@ -32,7 +32,7 @@ def get_config(data_path: Path, schema_path: Path) -> KnowledgeDependencies:
     return KnowledgeDependencies(data_path=data_path, schema_path=schema_path)
 
 
-def get_knowledge_agent(model: str) -> Agent[KnowledgeDependencies, None]:
+def get_knowledge_agent(model: str) -> Agent[KnowledgeDependencies, str]:
     """Initialize the Knowledge Agent.
 
     Args:

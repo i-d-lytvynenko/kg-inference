@@ -309,7 +309,7 @@ def suppress_stderr():
 async def validate_owl_ontology(
     ctx: RunContext[HasData],
     rdf_triplets: str,
-) -> None:
+) -> str:
     """
     Validate new data against an OWL ontology for logical consistency and save if successful.
 
@@ -317,7 +317,7 @@ async def validate_owl_ontology(
         rdf_triplets: Data content as a string in RDF/XML format.
 
     Returns:
-        None
+        rdf_triplets if validated successfully
     """
     logger.info("Validating OWL ontology.")
 
@@ -394,3 +394,5 @@ async def validate_owl_ontology(
         ctx.deps.data_path.write_text(prev_rdf_triplets + "\n\n" + rdf_triplets)
     else:
         ctx.deps.data_path.write_text(rdf_triplets)
+
+    return rdf_triplets
