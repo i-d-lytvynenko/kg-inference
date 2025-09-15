@@ -150,7 +150,9 @@ async def test_inspect_file(
 
 
 @pytest.mark.asyncio
-async def test_validate_schema_valid() -> None:
+async def test_validate_schema_valid(
+    mock_run_context_has_schema: RunContext[HasSchema],
+) -> None:
     valid_schema = """
         id: http://example.com/test_schema
         name: test_schema
@@ -160,21 +162,24 @@ async def test_validate_schema_valid() -> None:
               name:
                 range: string
     """
-    await validate_schema(valid_schema)
+    await validate_schema(ctx=mock_run_context_has_schema, schema_as_str=valid_schema)
 
 
 @pytest.mark.asyncio
-async def test_validate_schema_invalid_yaml() -> None:
+async def test_validate_schema_invalid_yaml(
+    mock_run_context_has_schema: RunContext[HasSchema],
+) -> None:
     invalid_schema = """
         id: http://example.com/test_schema
           name: test_schema
     """
     with pytest.raises(ModelRetry, match="Schema is not valid yaml"):
-        await validate_schema(invalid_schema)
-
+        await validate_schema(ctx=mock_run_context_has_schema, schema_as_str=invalid_schema)
 
 @pytest.mark.asyncio
-async def test_validate_schema_missing_id_name() -> None:
+async def test_validate_schema_missing_id_name(
+    mock_run_context_has_schema: RunContext[HasSchema],
+) -> None:
     invalid_schema = """
         classes:
           Person:
@@ -183,7 +188,7 @@ async def test_validate_schema_missing_id_name() -> None:
                 range: string
     """
     with pytest.raises(ModelRetry) as e:
-        await validate_schema(invalid_schema)
+        await validate_schema(ctx=mock_run_context_has_schema, schema_as_str=invalid_schema)
     assert "Schema does not have a top level id" in str(e.value)
     assert "Schema does not have a top level name" in str(e.value)
 
