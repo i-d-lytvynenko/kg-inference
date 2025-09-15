@@ -49,6 +49,7 @@ def get_schema_agent(
     linkml_agent = Agent(
         model=model,
         deps_type=SchemaDependencies,
+        retries=5,
         output_type=ToolOutput(validate_schema, max_retries=5),
         system_prompt=system_prompt,
     )
