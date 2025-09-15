@@ -88,8 +88,7 @@ def get_knowledge_agent(model: str) -> Agent[KnowledgeDependencies, str]:
     return Agent(
         model,
         deps_type=KnowledgeDependencies,
-        retries=3,
-        output_retries=3,
+        retries=5,
         output_type=ToolOutput(validate_owl_ontology, max_retries=5),
         system_prompt=system_prompt,
         tools=[
