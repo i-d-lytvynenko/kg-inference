@@ -54,16 +54,10 @@ async def generate_schema() -> None:
 
     print("Generating LinkML schema...")
 
-    deps = get_config()
+    deps = get_config(schema_path=settings.schema_path)
     schema = (await agent.run(prompt, deps=deps)).output
-    print("\n--- Generated LinkML Schema ---\n")
+    print("Generated LinkML Schema:")
     print(schema)
-
-    schema_file = settings.schema_path
-    schema_file.parent.mkdir(exist_ok=True, parents=True)
-    schema_file.write_text(schema)
-    print(f"\nSchema saved to {schema_file.absolute()}")
-
 
 if __name__ == "__main__":
     import mlflow

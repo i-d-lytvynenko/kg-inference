@@ -201,8 +201,9 @@ async def inspect_file(ctx: RunContext[HasWorkdir], data_file: str) -> str:
 
 
 async def validate_schema(
+    ctx: RunContext[HasSchema],
     schema_as_str: str,
-) -> None:
+) -> SchemaDefinition:
     """
     Validate a LinkML schema and save if successful.
 
@@ -210,7 +211,7 @@ async def validate_schema(
         schema_as_str: linkml schema (as yaml) to validate. Do not truncate, always pass the whole schema.
 
     Returns:
-        None
+        SchemaDefinition if validated successfully
     """
     logger.info(f"Validating schema: {schema_as_str}")
     try:
@@ -226,14 +227,27 @@ async def validate_schema(
     if msgs:
         raise ModelRetry("\n".join(msgs))
     try:
-        _ = cast(
+        linkml_schema = cast(
             SchemaDefinition,
             yaml_loader.loads(schema_as_str, target_class=SchemaDefinition),
         )
     except Exception as e:
-        logger.info(f"Invalid schema: {schema_as_str}")
-        msgs.append(f"Schema does not validate: {e}")
-        raise ModelRetry(f"Schema does not validate: {e}")
+        logger.info("Can't load schema definition")
+        raise ModelRetry(
+            f"Schema does not validate (can't load schema definition): {e}"
+        )
+    try:
+        gen = OwlSchemaGenerator(schema=linkml_schema, format="xml")
+        _ = gen.serialize()
+    except Exception as e:
+        logger.info("Can't serialize OWL from schema")
+        raise ModelRetry(
+            f"Schema does not validate (can't serialize OWL from schema): {e}"
+        )
+    schema_file = ctx.deps.schema_path
+    schema_file.parent.mkdir(exist_ok=True, parents=True)
+    schema_file.write_text(schema_as_str)
+    return linkml_schema
 
 
 async def validate_data(
@@ -349,13 +363,17 @@ async def validate_owl_ontology(
             )
 
             if prev_rdf_triplets is not None:
-                world.get_ontology(base_iri="http://example.org/prev_data#").load(
-                    fileobj=io.BytesIO(str.encode(prev_rdf_triplets))
-                ),
+                (
+                    world.get_ontology(base_iri="http://example.org/prev_data#").load(
+                        fileobj=io.BytesIO(str.encode(prev_rdf_triplets))
+                    ),
+                )
 
-            world.get_ontology(base_iri="http://example.org/new_data#").load(
-                fileobj=io.BytesIO(str.encode(rdf_triplets))
-            ),
+            (
+                world.get_ontology(base_iri="http://example.org/new_data#").load(
+                    fileobj=io.BytesIO(str.encode(rdf_triplets))
+                ),
+            )
             logger.info("Successfully loaded OWL ontology with new data.")
         except OwlReadyOntologyParsingError as e:
             raise ModelRetry(f"Error parsing OWL content: {e}")

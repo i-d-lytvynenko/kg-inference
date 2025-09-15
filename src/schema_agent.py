@@ -1,17 +1,21 @@
+from pathlib import Path
+
+from linkml_runtime.linkml_model import SchemaDefinition
 from pydantic_ai import Agent
 from pydantic_ai.output import ToolOutput
 
+from src.dependencies import HasSchema
 from src.tools import validate_schema
 from src.utils import format_prompt
 
 
-class SchemaDependencies:
+class SchemaDependencies(HasSchema):
     """Configuration for the Schema agent."""
 
     pass
 
 
-def get_config() -> SchemaDependencies:
+def get_config(schema_path: Path) -> SchemaDependencies:
     """
     Get the Schema agent configuration.
 
@@ -19,12 +23,12 @@ def get_config() -> SchemaDependencies:
         SchemaDependencies: The Schema dependencies
     """
 
-    return SchemaDependencies()
+    return SchemaDependencies(schema_path=schema_path)
 
 
 def get_schema_agent(
     model: str,
-) -> Agent[SchemaDependencies, None]:
+) -> Agent[SchemaDependencies, SchemaDefinition]:
     """Initialize the Schema Agent.
 
     Args:
