@@ -98,4 +98,5 @@ def get_knowledge_agent(model: str) -> Agent[KnowledgeDependencies, str]:
             retrieve_web_page,
             validate_data,
         ],
+        instrument=True,
     )

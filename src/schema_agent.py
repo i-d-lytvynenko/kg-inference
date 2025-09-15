@@ -52,5 +52,6 @@ def get_schema_agent(
         retries=5,
         output_type=ToolOutput(validate_schema, max_retries=5),
         system_prompt=system_prompt,
+        instrument=True,
     )
     return linkml_agent
