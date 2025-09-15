@@ -156,6 +156,8 @@ async def test_validate_schema_valid(
     valid_schema = """
         id: http://example.com/test_schema
         name: test_schema
+        imports:
+          - linkml:types
         classes:
           Person:
             attributes:
