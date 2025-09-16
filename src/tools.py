@@ -363,16 +363,12 @@ async def validate_owl_ontology(
             )
 
             if prev_rdf_triplets is not None:
-                (
-                    world.get_ontology(base_iri="http://example.org/prev_data#").load(
-                        fileobj=io.BytesIO(str.encode(prev_rdf_triplets))
-                    ),
+                world.get_ontology(base_iri="http://example.org/prev_data#").load(
+                    fileobj=io.BytesIO(str.encode(prev_rdf_triplets))
                 )
 
-            (
-                world.get_ontology(base_iri="http://example.org/new_data#").load(
-                    fileobj=io.BytesIO(str.encode(rdf_triplets))
-                ),
+            world.get_ontology(base_iri="http://example.org/new_data#").load(
+                fileobj=io.BytesIO(str.encode(rdf_triplets))
             )
             logger.info("Successfully loaded OWL ontology with new data.")
         except OwlReadyOntologyParsingError as e:
